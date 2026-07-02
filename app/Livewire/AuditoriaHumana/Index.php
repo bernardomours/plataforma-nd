@@ -97,14 +97,16 @@ class Index extends Component
         // --- 3.1 Busca Terapias Normais (Appointments) ---
         $queryAppointments = Appointment::with(['patient', 'therapy'])
             ->whereYear('appointment_date', $this->ano)
-            ->whereMonth('appointment_date', $this->mes);
-
-        // Aplica o filtro da Unidade (Buscando a unidade vinculada ao paciente)
-        if ($this->unidade_relatorio) {
-            $queryAppointments->whereHas('patient', function ($q) {
-                $q->where('unit_id', $this->unidade_relatorio);
+            ->whereMonth('appointment_date', $this->mes)
+            ->whereHas('patient', function ($q) {
+                // TRAVA DE SEGURANÇA: Buscar apenas pacientes do convênio Humana (ID 1)
+                $q->where('agreement_id', 1);
+                
+                // Aplica o filtro da Unidade
+                if ($this->unidade_relatorio) {
+                    $q->where('unit_id', $this->unidade_relatorio);
+                }
             });
-        }
 
         $systemAppointments = $queryAppointments->get();
 
@@ -127,14 +129,16 @@ class Index extends Component
         // --- 3.2 Busca Avaliações Neuro (Diário de Sessões) ---
         $queryNeuro = NeuroSession::with(['assessment.patient'])
             ->whereYear('date', $this->ano)
-            ->whereMonth('date', $this->mes);
-
-        // Filtra pela unidade cruzando a ponte: NeuroSession -> NeuroAssessment -> Patient
-        if ($this->unidade_relatorio) {
-            $queryNeuro->whereHas('assessment.patient', function ($q) {
-                $q->where('unit_id', $this->unidade_relatorio);
+            ->whereMonth('date', $this->mes)
+            ->whereHas('assessment.patient', function ($q) {
+                // TRAVA DE SEGURANÇA: Buscar apenas pacientes do convênio Humana (ID 1)
+                $q->where('agreement_id', 1);
+                
+                // Filtra pela unidade cruzando a ponte
+                if ($this->unidade_relatorio) {
+                    $q->where('unit_id', $this->unidade_relatorio);
+                }
             });
-        }
 
         $neuroSessions = $queryNeuro->get();
 
