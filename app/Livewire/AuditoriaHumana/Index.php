@@ -61,19 +61,22 @@ class Index extends Component
      */
     private function padronizarTerapia($nomeBruto) 
     {
-        $terapia = $this->limparTexto($nomeBruto); // Tira acentos antes de analisar
+        $terapia = $this->limparTexto($nomeBruto); 
         
         if (str_contains($terapia, 'ABA')) return 'ABA';
+        
+        if (str_contains($terapia, 'NEUROPSICOPEDAGOGIA')) return 'PSICOPEDAGOGIA';
         if (str_contains($terapia, 'PSICOPEDAGOGIA')) return 'PSICOPEDAGOGIA';
+        
         if (str_contains($terapia, 'PSICOMOTRICIDADE')) return 'PSICOMOTRICIDADE';
         if (str_contains($terapia, 'FONO')) return 'FONOAUDIOLOGIA';
+        if (str_contains($terapia, 'FISIO')) return 'FISIOTERAPIA'; 
         if (str_contains($terapia, 'OCUPACIONAL') || str_contains($terapia, 'AYRES') || str_contains($terapia, 'TO -')) return 'TERAPIA OCUPACIONAL';
         if (str_contains($terapia, 'PSICOTERAPIA') || str_contains($terapia, 'PSICOLOGIA')) return 'PSICOTERAPIA';
         
-        // Se tiver "AVALIA" no nome (Avaliação, Avaliacao, Avaliação Neuro), junta tudo!
         if (str_contains($terapia, 'AVALIA')) return 'AVALIAÇÃO NEURO'; 
 
-        return $terapia; // Fallback
+        return $terapia;
     }
 
     public function processar()
