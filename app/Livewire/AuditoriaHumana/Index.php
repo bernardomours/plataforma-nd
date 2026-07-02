@@ -30,17 +30,64 @@ class Index extends Component
         $this->ano = Carbon::now()->format('Y');
     }
 
+    /**
+     * FUNÇÃO PURIFICADORA 1: Remove acentos e espaços duplos
+     */
+    private function limparTexto($texto) 
+    {
+        if (empty($texto)) return '';
+        
+        $texto = trim(mb_strtoupper($texto, 'UTF-8'));
+        
+        $mapa = [
+            'Á'=>'A', 'À'=>'A', 'Ã'=>'A', 'Â'=>'A', 'Ä'=>'A',
+            'É'=>'E', 'È'=>'E', 'Ê'=>'E', 'Ë'=>'E',
+            'Í'=>'I', 'Ì'=>'I', 'Î'=>'I', 'Ï'=>'I',
+            'Ó'=>'O', 'Ò'=>'O', 'Õ'=>'O', 'Ô'=>'O', 'Ö'=>'O',
+            'Ú'=>'U', 'Ù'=>'U', 'Û'=>'U', 'Ü'=>'U',
+            'Ç'=>'C', 'Ñ'=>'N'
+        ];
+        
+        $texto = strtr($texto, $mapa);
+        
+        // Substitui 2 ou mais espaços por apenas 1 espaço (Resolve o bug do "Luis Guilherme" duplicado)
+        $texto = preg_replace('/\s+/', ' ', $texto);
+        
+        return trim($texto);
+    }
+
+    /**
+     * FUNÇÃO PURIFICADORA 2: Unifica o nome das terapias
+     */
+    private function padronizarTerapia($nomeBruto) 
+    {
+        $terapia = $this->limparTexto($nomeBruto); // Tira acentos antes de analisar
+        
+        if (str_contains($terapia, 'ABA')) return 'ABA';
+        if (str_contains($terapia, 'PSICOPEDAGOGIA')) return 'PSICOPEDAGOGIA';
+        if (str_contains($terapia, 'PSICOMOTRICIDADE')) return 'PSICOMOTRICIDADE';
+        if (str_contains($terapia, 'FONO')) return 'FONOAUDIOLOGIA';
+        if (str_contains($terapia, 'OCUPACIONAL') || str_contains($terapia, 'AYRES') || str_contains($terapia, 'TO -')) return 'TERAPIA OCUPACIONAL';
+        if (str_contains($terapia, 'PSICOTERAPIA') || str_contains($terapia, 'PSICOLOGIA')) return 'PSICOTERAPIA';
+        
+        // Se tiver "AVALIA" no nome (Avaliação, Avaliacao, Avaliação Neuro), junta tudo!
+        if (str_contains($terapia, 'AVALIA')) return 'AVALIAÇÃO NEURO'; 
+
+        return $terapia; // Fallback
+    }
+
     public function processar()
     {
-        // 1. Validação para obrigar a escolha da unidade, mês, ano e arquivo
         $this->validate([
-            'arquivo_csv' => 'required|file|mimes:csv,txt|max:5120', // Max 5MB
+            'arquivo_csv' => 'required|file|mimes:csv,txt|max:5120',
             'mes' => 'required|numeric',
             'ano' => 'required|numeric',
             'unidade_relatorio' => 'required',
         ]);
 
-        // 2. LER O CSV DA HUMANA
+        // ==========================================
+        // 1. LER O CSV DA HUMANA
+        // ==========================================
         $path = $this->arquivo_csv->getRealPath();
         $file = fopen($path, 'r');
         
@@ -51,33 +98,13 @@ class Index extends Component
                 continue;
             }
 
-            // Garante que a leitura do CSV venha em UTF-8 para evitar alguns caracteres bizarros
             $linha = array_map(fn($value) => mb_convert_encoding((string)$value, 'UTF-8', 'ISO-8859-1'), $linha);
 
-            $pacienteOriginal = trim(mb_strtoupper($linha[3]));
-            $terapiaBruta = trim(mb_strtoupper($linha[8]));
+            // Usa os Purificadores!
+            $pacienteOriginal = $this->limparTexto($linha[3]);
+            $terapiaSistema = $this->padronizarTerapia($linha[8]);
             $qtd = (int) $linha[9];
 
-            // --- NOVA LÓGICA DE TRADUÇÃO DE TERAPIAS (O Caça-Palavras) ---
-            $terapiaSistema = $terapiaBruta; // Padrão caso não ache nada
-
-            if (str_contains($terapiaBruta, 'ABA')) {
-                $terapiaSistema = 'ABA';
-            } elseif (str_contains($terapiaBruta, 'PSICOPEDAGOGIA')) {
-                $terapiaSistema = 'PSICOPEDAGOGIA';
-            } elseif (str_contains($terapiaBruta, 'PSICOMOTRICIDADE')) {
-                $terapiaSistema = 'PSICOMOTRICIDADE';
-            } elseif (str_contains($terapiaBruta, 'FONO')) {
-                $terapiaSistema = 'FONOAUDIOLOGIA';
-            } elseif (str_contains($terapiaBruta, 'TO -') || str_contains($terapiaBruta, 'TERAPIA OCUPACIONAL') || str_contains($terapiaBruta, 'AYRES')) {
-                $terapiaSistema = 'TERAPIA OCUPACIONAL';
-            } elseif (str_contains($terapiaBruta, 'PSICOTERAPIA') || str_contains($terapiaBruta, 'PSICOLOGIA')) {
-                $terapiaSistema = 'PSICOTERAPIA';
-            } elseif (str_contains($terapiaBruta, 'AVALIA') && str_contains($terapiaBruta, 'NEURO')) {
-                $terapiaSistema = 'AVALIAÇÃO NEURO';
-            }
-
-            // Cria a chave única para agrupar (Paciente + Terapia Limpa)
             $chave = $pacienteOriginal . '|' . $terapiaSistema;
 
             if (!isset($humanaData[$chave])) {
@@ -91,18 +118,17 @@ class Index extends Component
         }
         fclose($file);
 
-        // 3. BUSCAR DADOS DO SISTEMA NO MESMO PERÍODO E UNIDADE
+        // ==========================================
+        // 2. BUSCAR DADOS DO SISTEMA NO MESMO PERÍODO
+        // ==========================================
         $sistemaData = [];
 
-        // --- 3.1 Busca Terapias Normais (Appointments) ---
+        // --- 2.1 Busca Terapias Normais (Appointments) ---
         $queryAppointments = Appointment::with(['patient', 'therapy'])
             ->whereYear('appointment_date', $this->ano)
             ->whereMonth('appointment_date', $this->mes)
             ->whereHas('patient', function ($q) {
-                // TRAVA DE SEGURANÇA: Buscar apenas pacientes do convênio Humana (ID 1)
                 $q->where('agreement_id', 1);
-                
-                // Aplica o filtro da Unidade
                 if ($this->unidade_relatorio) {
                     $q->where('unit_id', $this->unidade_relatorio);
                 }
@@ -113,11 +139,11 @@ class Index extends Component
         foreach ($systemAppointments as $app) {
             if (!$app->patient || !$app->therapy) continue;
 
-            $paciente = trim(mb_strtoupper($app->patient->name));
-            $terapia = trim(mb_strtoupper($app->therapy->name));
+            // Usa os Purificadores para o Banco de Dados também!
+            $paciente = $this->limparTexto($app->patient->name);
+            $terapia = $this->padronizarTerapia($app->therapy->name); 
             
             $qtd = $app->session_number ?? 1; 
-
             $chave = $paciente . '|' . $terapia;
 
             if (!isset($sistemaData[$chave])) {
@@ -126,15 +152,12 @@ class Index extends Component
             $sistemaData[$chave] += $qtd;
         }
 
-        // --- 3.2 Busca Avaliações Neuro (Diário de Sessões) ---
+        // --- 2.2 Busca Avaliações Neuro (Diário de Sessões) ---
         $queryNeuro = NeuroSession::with(['assessment.patient'])
             ->whereYear('date', $this->ano)
             ->whereMonth('date', $this->mes)
             ->whereHas('assessment.patient', function ($q) {
-                // TRAVA DE SEGURANÇA: Buscar apenas pacientes do convênio Humana (ID 1)
                 $q->where('agreement_id', 1);
-                
-                // Filtra pela unidade cruzando a ponte
                 if ($this->unidade_relatorio) {
                     $q->where('unit_id', $this->unidade_relatorio);
                 }
@@ -143,12 +166,11 @@ class Index extends Component
         $neuroSessions = $queryNeuro->get();
 
         foreach ($neuroSessions as $session) {
-            // Verifica se as relações existem para o código não quebrar
             if (!$session->assessment || !$session->assessment->patient) continue;
 
-            $paciente = trim(mb_strtoupper($session->assessment->patient->name));
-            $terapia = 'AVALIAÇÃO NEURO'; // Nome fixo que dá "Match" com a conversão do CSV
-            $qtd = 1; // Cada registro na tabela NeuroSession é 1 sessão realizada
+            $paciente = $this->limparTexto($session->assessment->patient->name);
+            $terapia = 'AVALIAÇÃO NEURO'; 
+            $qtd = 1; 
 
             $chave = $paciente . '|' . $terapia;
 
@@ -158,7 +180,9 @@ class Index extends Component
             $sistemaData[$chave] += $qtd;
         }
 
-        // 4. CRUZAR OS DADOS (O MATCH)
+        // ==========================================
+        // 3. CRUZAR OS DADOS (O MATCH)
+        // ==========================================
         $comparativo = [];
         $todasAsChaves = array_unique(array_merge(array_keys($humanaData), array_keys($sistemaData)));
 
@@ -192,12 +216,9 @@ class Index extends Component
         }
 
         usort($comparativo, function($a, $b) {
-            // Se o nome do paciente for igual, ordena pela terapia
             if ($a['paciente'] === $b['paciente']) {
                 return $a['terapia'] <=> $b['terapia'];
             }
-            
-            // Retorna a ordem alfabética dos pacientes
             return $a['paciente'] <=> $b['paciente'];
         });
 
@@ -212,14 +233,12 @@ class Index extends Component
 
     public function exportarPDF()
     {
-        // 1. Pega o nome da unidade para o cabeçalho
         $unidadeNome = 'Todas as Unidades';
         if ($this->unidade_relatorio) {
             $unidade = Unit::find($this->unidade_relatorio);
             $unidadeNome = $unidade ? ($unidade->city ?? $unidade->name) : 'Todas as Unidades';
         }
 
-        // 2. Prepara as estatísticas usando TODOS os resultados (para os cards do topo ficarem corretos)
         $totalSistema = array_sum(array_column($this->resultados, 'qtd_sistema'));
         $totalHumana = array_sum(array_column($this->resultados, 'qtd_humana'));
         $totalBateu = count(array_filter($this->resultados, fn($r) => $r['cor'] === 'green'));
@@ -230,7 +249,7 @@ class Index extends Component
         });
 
         $data = [
-            'resultados' => $resultadosDivergentes, // Tabela receberá apenas os erros
+            'resultados' => $resultadosDivergentes,
             'mes' => $this->mes,
             'ano' => $this->ano,
             'unidadeNome' => $unidadeNome,
@@ -240,7 +259,6 @@ class Index extends Component
             'totalDivergencias' => $totalDivergencias,
         ];
 
-        // 5. Gera o PDF usando a view dedicada
         $pdf = Pdf::loadView('pdf.auditoria-humana', $data);
         
         return response()->streamDownload(function () use ($pdf) {
