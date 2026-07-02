@@ -219,9 +219,19 @@
                                 @if($selectedColumns['registrado_em']) <td class="py-4 px-4 text-xs">{{ $appointment->created_at ? $appointment->created_at->format('d/m/Y H:i') : '-' }}</td> @endif
                                 @if($selectedColumns['atualizado_em']) <td class="py-4 px-4 text-xs">{{ $appointment->updated_at ? $appointment->updated_at->format('d/m/Y H:i') : '-' }}</td> @endif
                                 <td class="py-4 px-4 text-right">
-                                    <a href="{{ route('terapias-realizadas.edit', $appointment->id) }}" wire:navigate class="text-blue-600 hover:text-blue-800 font-semibold text-xs">
-                                        Editar
-                                    </a>
+                                    <div class="flex items-center justify-end gap-3">
+                                        <a href="{{ route('terapias-realizadas.edit', $appointment->id) }}" wire:navigate class="text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors">
+                                            Editar
+                                        </a>
+                                        <button 
+                                            type="button" 
+                                            wire:click="deleteAppointment({{ $appointment->id }})" 
+                                            wire:confirm="Tem certeza que deseja excluir esta consulta? Essa ação não pode ser desfeita."
+                                            class="text-red-500 hover:text-red-700 font-semibold text-xs transition-colors"
+                                        >
+                                            Excluir
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

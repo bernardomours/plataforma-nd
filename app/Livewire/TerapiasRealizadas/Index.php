@@ -206,6 +206,17 @@ class Index extends Component
         }, 'relatorio-terapias-' . now()->timezone('America/Fortaleza')->format('d-m-Y_H-i') . '.pdf');
     }
 
+    public function deleteAppointment($id)
+    {
+        $appointment = Appointment::find($id); 
+        
+        if ($appointment) {
+            $appointment->delete();
+            
+            $this->dispatch('notify', 'Atendimento excluído com sucesso!');
+        }
+    }
+
     public function exportExcel()
     {
         // 1. Executa a query aplicando as mesmas regras de filtragem e unidade permitida
