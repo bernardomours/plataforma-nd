@@ -242,7 +242,10 @@ class Index extends Component
         $totalSistema = array_sum(array_column($this->resultados, 'qtd_sistema'));
         $totalHumana = array_sum(array_column($this->resultados, 'qtd_humana'));
         $totalBateu = count(array_filter($this->resultados, fn($r) => $r['cor'] === 'green'));
-        $totalDivergencias = count(array_filter($this->resultados, fn($r) => $r['cor'] !== 'green'));
+        $totalDivergencias = 0;
+        foreach ($this->resultados as $item) {
+            $totalDivergencias += abs($item['qtd_sistema'] - $item['qtd_humana']);
+        }
 
         $resultadosDivergentes = array_filter($this->resultados, function($item) {
             return $item['cor'] !== 'green'; 

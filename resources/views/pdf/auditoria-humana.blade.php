@@ -49,7 +49,6 @@
     </header>
 
     <main>
-        <!-- Cards Superiores com o Resumo -->
         <table class="widgets-table">
             <tr>
                 <td class="widget-card">
@@ -61,24 +60,19 @@
                     <span class="widget-value">{{ $totalHumana }}</span>
                 </td>
                 <td class="widget-card">
-                    <span class="widget-title">Registros Corretos</span>
-                    <span class="widget-value status-green">{{ $totalBateu }}</span>
-                </td>
-                <td class="widget-card">
-                    <span class="widget-title">Total de Divergências</span>
+                    <span class="widget-title">Sessões Divergentes (Qtd)</span>
                     <span class="widget-value status-red">{{ $totalDivergencias }}</span>
                 </td>
             </tr>
         </table>
 
-        <!-- Tabela Principal do Relatório -->
         <table class="data-table">
             <thead>
                 <tr>
                     <th width="40%">Paciente</th>
                     <th width="20%">Terapia</th>
-                    <th class="text-center" width="10%">Qtd. Sistema</th>
-                    <th class="text-center" width="10%">Qtd. Humana</th>
+                    <th class="text-center" width="10%">PLATAFORMA ND</th>
+                    <th class="text-center" width="10%">Sistema Humana</th>
                     <th class="text-right" width="20%">Status</th>
                 </tr>
             </thead>
