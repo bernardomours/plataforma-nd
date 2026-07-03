@@ -58,7 +58,7 @@
                                     $props = $props ? $props->toArray() : [];
                                 }
 
-                                // 2. O SEGREDO: Busca da nova coluna 'attribute_changes' se properties estiver vazia
+                                // 2. Busca da nova coluna 'attribute_changes' se properties estiver vazia
                                 $mudancasAtributos = $atividade->attribute_changes ?? null;
                                 if ($mudancasAtributos) {
                                     if (is_string($mudancasAtributos)) {
@@ -75,7 +75,7 @@
 
                                 $atributos = $props['attributes'] ?? [];
 
-                                // Determina o nome do modelo para exibir
+                                // Determina o nome do modelo padrão para exibição genérica
                                 $modeloNome = match($modeloOriginal) {
                                     'Patient' => 'Paciente',
                                     'Professional' => 'Profissional',
@@ -84,14 +84,58 @@
                                     default => $modeloOriginal
                                 };
 
-                                // Pega o nome de quem sofreu a ação
+                                // =======================================================
+                                // O SEGREDO: BUSCAR O NOME INCLUSIVE NA LIXEIRA (TRASHED)
+                                // =======================================================
                                 if ($isMovement) {
-                                    $subjectName = $atividade->subject?->moveable?->name ?? 'Registro';
+                                    $movimento = $atividade->subject;
+                                    
+                                    if ($movimento) {
+                                        $alvo = $movimento->moveable;
+
+                                        // SE ELE ESTIVER INATIVADO/APAGADO, VAMOS BUSCAR COM withTrashed()
+                                        if (!$alvo && !empty($movimento->moveable_type) && !empty($movimento->moveable_id)) {
+                                            $tipoClass = $movimento->moveable_type;
+                                            if (class_exists($tipoClass)) {
+                                                $usaSoftDeletes = in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses_recursive($tipoClass));
+                                                if ($usaSoftDeletes) {
+                                                    $alvo = $tipoClass::withTrashed()->find($movimento->moveable_id);
+                                                }
+                                            }
+                                        }
+
+                                        if ($alvo) {
+                                            // Acha quem sofreu a ação
+                                            $tipoAlvo = class_basename(get_class($alvo)); 
+                                            
+                                            if ($tipoAlvo === 'Patient' || $tipoAlvo === 'Paciente') {
+                                                $modeloNome = 'Desligamento/Entrada - Paciente';
+                                            } elseif ($tipoAlvo === 'Professional' || $tipoAlvo === 'Profissional') {
+                                                $modeloNome = 'Desligamento/Entrada - Profissional';
+                                            } else {
+                                                $modeloNome = 'Desligamento/Entrada - ' . $tipoAlvo;
+                                            }
+                                            
+                                            $subjectName = $alvo->name ?? 'Desconhecido';
+                                            
+                                        } else {
+                                            // Hard Delete (Excluído do banco permanentemente e não tem mais volta)
+                                            $tipoString = $movimento->moveable_type ?? '';
+                                            if (str_contains($tipoString, 'Patient')) {
+                                                $modeloNome = 'Desligamento/Entrada - Paciente';
+                                            } elseif (str_contains($tipoString, 'Professional')) {
+                                                $modeloNome = 'Desligamento/Entrada - Profissional';
+                                            }
+                                            $subjectName = 'Registro Excluído do Sistema';
+                                        }
+                                    } else {
+                                        $subjectName = 'Registro Excluído Definitivamente';
+                                    }
                                 } else {
                                     $subjectName = $atividade->subject?->name ?? 'Registro #' . $atividade->subject_id;
                                 }
 
-                                // Lógica de extração da Ação
+                                // Lógica de extração da Ação (Badges)
                                 $badgeAcao = '';
                                 $badgeColor = '';
 
@@ -143,7 +187,8 @@
                                 </td>
 
                                 <td class="py-4 px-6 text-gray-700">
-                                    {{ $modeloNome }} <span class="text-gray-500">({{ mb_strtoupper($subjectName) }})</span>
+                                    <span class="font-medium text-gray-900">{{ $modeloNome }}</span> 
+                                    <span class="text-gray-500 font-semibold">({{ mb_strtoupper($subjectName) }})</span>
                                 </td>
 
                                 <td class="py-4 px-6 text-gray-700 max-w-sm whitespace-normal text-sm">
@@ -152,6 +197,26 @@
                                             <span class="w-2.5 h-2.5 rounded-full {{ $badgeAcao === 'SAÍDA' ? 'bg-red-500' : 'bg-green-500' }} mr-2"></span>
                                             Registro de {{ ucfirst(mb_strtolower($badgeAcao)) }} oficializado.
                                         </div>
+                                        
+                                        {{-- NOVO: PUXANDO O MOTIVO E OBSERVAÇÃO --}}
+                                        @php
+                                            // Altere os nomes em verde abaixo se as colunas no seu banco forem diferentes!
+                                            $motivo = $atributos['motivo'] ?? $atributos['reason'] ?? $atributos['description'] ?? null;
+                                            $observacao = $atributos['observacao'] ?? $atributos['observation'] ?? $atributos['notes'] ?? null;
+                                        @endphp
+                                        
+                                        @if($motivo)
+                                            <div class="mt-1.5 text-xs text-gray-600">
+                                                <strong class="text-gray-800">Motivo:</strong> {{ $motivo }}
+                                            </div>
+                                        @endif
+                                        
+                                        @if($observacao)
+                                            <div class="mt-0.5 text-xs text-gray-500">
+                                                <strong class="text-gray-800">Obs:</strong> <span class="italic">{{ $observacao }}</span>
+                                            </div>
+                                        @endif
+                                        
                                     @elseif($atividade->event === 'created')
                                         Cadastro realizado no sistema.
                                     @elseif($atividade->event === 'deleted')
