@@ -128,83 +128,88 @@
         </div>
     </div>
 
-    @if($isModalOpen)
-        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity backdrop-blur-sm" wire:click="closeModal"></div>
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+    <div x-data="{ open: $wire.entangle('isModalOpen') }" x-show="open" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity backdrop-blur-sm" wire:click="closeModal"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-                    <form wire:submit.prevent="saveRecord">
-                        <div class="bg-white px-6 pt-6 pb-4">
-                            <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4 border-b pb-2" id="modal-title">
-                                {{ $editingRecordId ? 'Editar Solicitação' : 'Nova Solicitação' }}
-                            </h3>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <form wire:submit.prevent="saveRecord">
+                    <div class="bg-white px-6 pt-6 pb-6">
+                        <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4 border-b pb-2" id="modal-title">
+                            {{ $editingRecordId ? 'Editar Solicitação' : 'Nova Solicitação' }}
+                        </h3>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Terapia <span class="text-red-500">*</span></label>
-                                    <select wire:model="therapy_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        <option value="">Selecione</option>
-                                        @foreach($therapies as $therapy)
-                                            <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('therapy_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                                </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Terapia <span class="text-red-500">*</span></label>
+                                <select wire:model="therapy_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">Selecione</option>
+                                    @foreach($therapies as $therapy)
+                                        <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('therapy_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Tipo de Atendimento <span class="text-red-500">*</span></label>
-                                    <select wire:model="service_type_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                        <option value="">Selecione</option>
-                                        @foreach($serviceTypes as $type)
-                                            <option value="{{ $type->id }}">{{ $type->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('service_type_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Tipo de Atendimento <span class="text-red-500">*</span></label>
+                                <select wire:model="service_type_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">Selecione</option>
+                                    @foreach($serviceTypes as $type)
+                                        <option value="{{ $type->id }}">{{ $type->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('service_type_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Mês/Ano <span class="text-red-500">*</span></label>
-                                    <input type="month" wire:model="month_year" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                    @error('month_year') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Mês/Ano <span class="text-red-500">*</span></label>
+                                <input type="month" wire:model="month_year" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                @error('month_year') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Número da Requisição <span class="text-red-500">*</span></label>
-                                    <input type="text" wire:model="requisition_number" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                    @error('requisition_number') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Número da Requisição <span class="text-red-500">*</span></label>
+                                <input type="text" wire:model="requisition_number" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                @error('requisition_number') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">CH Solicitada <span class="text-red-500">*</span></label>
-                                    <input type="number" step="0.01" wire:model="requested_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                    @error('requested_hours') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">CH Solicitada <span class="text-red-500">*</span></label>
+                                <input type="number" step="0.01" wire:model="requested_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                @error('requested_hours') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">CH Liberada</label>
-                                    <input type="number" step="0.01" wire:model="approved_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">CH Liberada</label>
+                                <input type="number" step="0.01" wire:model="approved_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">CH Planejada</label>
-                                    <input type="number" step="0.01" wire:model="planned_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">CH Planejada</label>
+                                <input type="number" step="0.01" wire:model="planned_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                             </div>
                         </div>
-                        
-                        <div class="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse rounded-b-xl">
-                            <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                                Salvar
+                    </div>
+                    
+                    <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                        <button type="button" wire:click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-md hover:bg-gray-100 text-sm font-semibold transition-colors shadow-sm">
+                            Cancelar
+                        </button>
+
+                        @if(!$editingRecordId)
+                            <button type="button" wire:click="saveAndCreateAnother" class="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors shadow-sm">
+                                Salvar e Criar Outro
                             </button>
-                            <button type="button" wire:click="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                        @endif
+
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm">
+                            Salvar
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-    @endif
+    </div>
 </div>

@@ -85,23 +85,7 @@ class CargaHoraria extends Component
         $this->service_type_id = '';
     }
 
-    public function editRecord(RequestedService $record)
-    {
-        $this->resetValidation();
-        
-        $this->editingRecordId = $record->id;
-        $this->month_year = $record->month_year ? Carbon::parse($record->month_year)->format('Y-m') : '';
-        $this->requisition_number = $record->requisition_number;
-        $this->requested_hours = $record->requested_hours;
-        $this->approved_hours = $record->approved_hours;
-        $this->planned_hours = $record->planned_hours;
-        $this->therapy_id = $record->therapy_id;
-        $this->service_type_id = $record->service_type_id;
-
-        $this->isModalOpen = true;
-    }
-
-    public function saveRecord()
+    private function processSave()
     {
         $this->validate();
 
@@ -125,8 +109,20 @@ class CargaHoraria extends Component
             RequestedService::create($data);
             session()->flash('message', 'Solicitação criada com sucesso!');
         }
+    }
 
-        $this->closeModal();
+    public function saveRecord()
+    {
+        $this->processSave(); 
+        $this->closeModal();  
+    }
+
+    public function saveAndCreateAnother()
+    {
+        $this->processSave(); 
+        
+        $this->resetForm();
+        $this->resetValidation();
     }
 
     public function deleteRecord($id)
