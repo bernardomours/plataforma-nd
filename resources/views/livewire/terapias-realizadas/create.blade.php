@@ -30,47 +30,94 @@
             @endif
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Paciente <span class="text-red-500">*</span></label>
-                    <select wire:model.live="patient_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Selecione o Paciente</option>
-                        @foreach($patients as $patient)
-                            <option value="{{ $patient->id }}">{{ $patient->name }}</option>
-                        @endforeach
-                    </select>
+                    <div wire:ignore x-data="{
+                        tom: null,
+                        init() {
+                            this.tom = new TomSelect(this.$refs.select, { create: false });
+                            this.tom.on('change', (val) => { $wire.set('patient_id', val); });
+                            this.$watch('$wire.patient_id', (val) => {
+                                if (this.tom.getValue() !== val) this.tom.setValue(val, true);
+                            });
+                        }
+                    }">
+                        <select x-ref="select" placeholder="Selecione o Paciente" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Selecione o Paciente</option>
+                            @foreach($patients as $patient)
+                                <option value="{{ $patient->id }}">{{ $patient->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     @error('patient_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Terapia <span class="text-red-500">*</span></label>
-                    <select wire:model.live="therapy_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Selecione a Terapia</option>
-                        @foreach($therapies as $therapy)
-                            <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
-                        @endforeach
-                    </select>
+                    <div wire:ignore x-data="{
+                        tom: null,
+                        init() {
+                            this.tom = new TomSelect(this.$refs.select, { create: false });
+                            this.tom.on('change', (val) => { $wire.set('therapy_id', val); });
+                            this.$watch('$wire.therapy_id', (val) => {
+                                if (this.tom.getValue() !== val) this.tom.setValue(val, true);
+                            });
+                        }
+                    }">
+                        <select x-ref="select" placeholder="Selecione a Terapia" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Selecione a Terapia</option>
+                            @foreach($therapies as $therapy)
+                                <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     @error('therapy_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Profissional <span class="text-red-500">*</span></label>
-                    <select wire:model="professional_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" {{ empty($therapy_id) ? 'disabled' : '' }}>
-                        <option value="">{{ empty($therapy_id) ? 'Selecione a Terapia primeiro' : 'Selecione o Profissional' }}</option>
-                        @foreach($professionals as $professional)
-                            <option value="{{ $professional->id }}">{{ $professional->name }}</option>
-                        @endforeach
-                    </select>
+                    <div wire:key="prof-select-{{ $therapy_id ?? 'empty' }}">
+                        <div wire:ignore x-data="{
+                            tom: null,
+                            init() {
+                                this.tom = new TomSelect(this.$refs.select, { create: false });
+                                this.tom.on('change', (val) => { $wire.set('professional_id', val); });
+                                this.$watch('$wire.professional_id', (val) => {
+                                    if (this.tom.getValue() !== val) this.tom.setValue(val, true);
+                                });
+                            }
+                        }">
+                            <select x-ref="select" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" {{ empty($therapy_id) ? 'disabled' : '' }} placeholder="{{ empty($therapy_id) ? 'Selecione a Terapia primeiro' : 'Selecione o Profissional' }}">
+                                <option value="">{{ empty($therapy_id) ? 'Selecione a Terapia primeiro' : 'Selecione o Profissional' }}</option>
+                                @foreach($professionals as $professional)
+                                    <option value="{{ $professional->id }}">{{ $professional->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
                     @error('professional_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Atendimento <span class="text-red-500">*</span></label>
-                    <select wire:model="service_type_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Selecione o Tipo</option>
-                        @foreach($serviceTypes as $serviceType)
-                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                        @endforeach
-                    </select>
+                    <div wire:ignore x-data="{
+                        tom: null,
+                        init() {
+                            this.tom = new TomSelect(this.$refs.select, { create: false });
+                            this.tom.on('change', (val) => { $wire.set('service_type_id', val); });
+                            this.$watch('$wire.service_type_id', (val) => {
+                                if (this.tom.getValue() !== val) this.tom.setValue(val, true);
+                            });
+                        }
+                    }">
+                        <select x-ref="select" placeholder="Selecione o Tipo" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Selecione o Tipo</option>
+                            @foreach($serviceTypes as $serviceType)
+                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     @error('service_type_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
             </div>
