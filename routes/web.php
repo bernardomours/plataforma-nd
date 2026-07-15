@@ -132,6 +132,9 @@ Route::middleware('auth')->group(function () {
             abort(403, 'Acesso restrito a administradores.');
         }
 
+        // A CORREÇÃO ESTÁ AQUI: Garante que o cargo "profissional" existe no banco antes de o atribuir
+        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'profissional']);
+
         $profissionais = Professional::with('units')->get();
         $criados = 0;
         $atualizados = 0;
