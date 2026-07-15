@@ -7,6 +7,7 @@ use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\Unit;
+use Spatie\Permission\Models\Role; // Importação do Spatie
 
 #[Layout('layouts.app')]
 class Create extends Component
@@ -15,9 +16,9 @@ class Create extends Component
     public $email = '';
     public $password = '';
     public $birth_date = '';
-    public $role = '';
+    public $selected_roles = []; // Mudou de string para Array
     public $can_access_production = false;
-    public $selected_units = []; // Array para as unidades
+    public $selected_units = [];
 
     public function mount()
     {
@@ -30,10 +31,10 @@ class Create extends Component
     {
         $this->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email' . (isset($this->user) ? ',' . $this->user->id : ''),
-            'password' => isset($this->user) ? 'nullable|string|min:8' : 'required|string|min:8',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
             'birth_date' => 'required|date', 
-            'role' => 'required|string',
+            'selected_roles' => 'required|array|min:1', // Exige pelo menos um cargo
             'selected_units' => 'nullable|array', 
         ]);
 
@@ -42,14 +43,17 @@ class Create extends Component
             'email' => $this->email,
             'password' => Hash::make($this->password),
             'birth_date' => $this->birth_date,
-            'role' => $this->role,
             'can_access_production' => $this->can_access_production,
             'unit_id' => $this->selected_units[0] ?? null, 
         ]);
 
-        // Sincroniza a tabela pivô (many-to-many)
+        // Sincroniza as Unidades
         $user->units()->sync($this->selected_units);
+        
+        // Mágica do Spatie: Sincroniza os múltiplos papéis escolhidos
+        $user->syncRoles($this->selected_roles);
 
+        session()->flash('message', 'Usuário criado com sucesso.');
         return redirect()->route('usuarios.index');
     }
 
@@ -57,6 +61,7 @@ class Create extends Component
     {
         return view('livewire.usuarios.create', [
             'unidades' => Unit::orderBy('city')->get(),
+            'todasRoles' => Role::all(), // Envia as roles oficiais para a tela
         ]);
     }
 }

@@ -6,8 +6,10 @@ use Livewire\Component;
 use App\Models\Professional;
 use App\Models\Unit;
 use App\Models\Therapy;
+use App\Models\User;
 use App\Enums\ProfessionalRole;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Hash; 
 
 #[Layout('layouts.app')]
 class Edit extends Component
@@ -79,6 +81,43 @@ class Edit extends Component
         $record->units()->sync($this->selectedUnits);
         
         $record->therapies()->sync($this->selectedTherapies ?: []);
+
+        if (!empty($this->email)) {
+            
+            if ($record->user_id) {
+                $user = User::find($record->user_id);
+                if ($user) {
+                    $user->update([
+                        'name' => $this->name,
+                        'email' => $this->email,
+                        'birth_date' => $this->birth_date,
+                        'unit_id' => $this->selectedUnits[0] ?? null, 
+                    ]);
+
+                    $user->units()->sync($this->selectedUnits); 
+                }
+            } else {
+                $user = User::firstOrCreate(
+                    ['email' => $this->email],
+                    [
+                        'name' => $this->name,
+                        'password' => Hash::make('mudar123'),
+                        'birth_date' => $this->birth_date,
+                        'unit_id' => $this->selectedUnits[0] ?? null,
+                    ]
+                );
+
+                if (!$user->hasRole('profissional')) {
+                    $user->assignRole('profissional');
+                }
+
+                if (!empty($this->selectedUnits)) {
+                    $user->units()->syncWithoutDetaching($this->selectedUnits);
+                }
+
+                $record->update(['user_id' => $user->id]);
+            }
+        }
 
         session()->flash('message', "Profissional {$record->name} atualizado com sucesso.");
         

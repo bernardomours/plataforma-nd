@@ -23,6 +23,7 @@ class Schedule extends Model
         'professional_id',
         'therapy_id',
         'service_type_id',
+        'is_blocked',
     ];
 
     /**

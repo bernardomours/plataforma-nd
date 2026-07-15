@@ -79,27 +79,38 @@
                                     </td>
 
                                     <td class="py-3 px-6">
-                                        @php
-                                            $roleColors = [
-                                                'admin' => 'bg-red-50 text-red-700 border-red-100',
-                                                'manager' => 'bg-orange-50 text-orange-700 border-orange-100',
-                                                'administrative' => 'bg-gray-50 text-gray-700 border-gray-200',
-                                                'coordinator' => 'bg-blue-50 text-blue-700 border-blue-100',
-                                                'supervisor' => 'bg-green-50 text-green-700 border-green-100',
-                                            ];
-                                            $roleNames = [
-                                                'admin' => 'Administrador',
-                                                'manager' => 'Gerência Geral',
-                                                'administrative' => 'Administrativo',
-                                                'coordinator' => 'Coordenação',
-                                                'supervisor' => 'Supervisão',
-                                            ];
-                                            $color = $roleColors[$usuario->role] ?? 'bg-gray-50 text-gray-700 border-gray-200';
-                                            $name = $roleNames[$usuario->role] ?? ucfirst($usuario->role);
-                                        @endphp
-                                        <span class="px-2 py-0.5 text-xs font-semibold rounded border {{ $color }}">
-                                            {{ $name }}
-                                        </span>
+                                        <div class="flex flex-wrap gap-1">
+                                            @forelse($usuario->roles as $role)
+                                                @php
+                                                    $roleColors = [
+                                                        'admin' => 'bg-red-50 text-red-700 border-red-100',
+                                                        'manager' => 'bg-orange-50 text-orange-700 border-orange-100',
+                                                        'administrative' => 'bg-gray-50 text-gray-700 border-gray-200',
+                                                        'coordinator' => 'bg-blue-50 text-blue-700 border-blue-100',
+                                                        'supervisor' => 'bg-green-50 text-green-700 border-green-100',
+                                                        'profissional' => 'bg-purple-50 text-purple-700 border-purple-100',
+                                                    ];
+                                                    $roleNames = [
+                                                        'admin' => 'Administrador',
+                                                        'manager' => 'Gerência Geral',
+                                                        'administrative' => 'Administrativo',
+                                                        'coordinator' => 'Coordenação',
+                                                        'supervisor' => 'Supervisão',
+                                                        'profissional' => 'Profissional',
+                                                    ];
+                                                    
+                                                    $color = $roleColors[$role->name] ?? 'bg-gray-50 text-gray-700 border-gray-200';
+                                                    $name = $roleNames[$role->name] ?? ucfirst($role->name);
+                                                @endphp
+                                                <span class="px-2 py-0.5 text-xs font-semibold rounded border {{ $color }}">
+                                                    {{ $name }}
+                                                </span>
+                                            @empty
+                                                <span class="px-2 py-0.5 text-xs font-semibold rounded border bg-gray-50 text-gray-500 border-gray-200">
+                                                    Sem Função
+                                                </span>
+                                            @endforelse
+                                        </div>
                                     </td>
 
                                     <td class="py-3 px-6">

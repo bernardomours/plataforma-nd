@@ -303,6 +303,17 @@ class Index extends Component
         ];
     }
 
+    public function mount()
+    {
+        $user = auth()->user();
+        
+        if (!$user->hasAnyRole(['admin', 'manager', 'administrative']) && $user->hasRole('profissional')) {
+            if ($user->professional) {
+                $this->professional_id = $user->professional->id;
+            }
+        }
+    }
+
     public function processImport()
     {
         // 1. Validação do formulário

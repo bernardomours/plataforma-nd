@@ -4,44 +4,48 @@
         <p class="text-sm text-gray-500 mt-1">Registro de todas as consultas da clínica</p>
     </div>
 
-    <div class="max-w-full mx-auto sm:px-6 lg:px-8 mt-6 mb-4">
-        <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('terapias-realizadas.create') }}" class="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-md hover:bg-blue-600 transition-colors shadow-sm">
-                Registrar Consulta
-            </a>
+    @hasanyrole('admin|manager|administrative')
+        <div class="max-w-full mx-auto sm:px-6 lg:px-8 mt-6 mb-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('terapias-realizadas.create') }}" class="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-md hover:bg-blue-600 transition-colors shadow-sm">
+                    Registrar Atendimento
+                </a>
 
-            <button type="button" wire:click.prevent="exportPdf" class="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-md hover:bg-red-600 transition-colors shadow-sm flex items-center gap-2">
-                <svg wire:loading.remove wire:target="exportPdf" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <svg wire:loading wire:target="exportPdf" class="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span wire:loading.remove wire:target="exportPdf">Exportar para PDF</span>
-                <span wire:loading wire:target="exportPdf">Gerando...</span>
-            </button>
+                @hasanyrole('admin|manager')
+                <button type="button" wire:click.prevent="exportPdf" class="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-md hover:bg-red-600 transition-colors shadow-sm flex items-center gap-2">
+                    <svg wire:loading.remove wire:target="exportPdf" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <svg wire:loading wire:target="exportPdf" class="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportPdf">Exportar para PDF</span>
+                    <span wire:loading wire:target="exportPdf">Gerando...</span>
+                </button>
 
-            <button type="button" wire:click.prevent="exportExcel" wire:loading.attr="disabled" class="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50">
-                <svg wire:loading.remove wire:target="exportExcel" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                </svg>
-                
-                <svg wire:loading wire:target="exportExcel" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <button type="button" wire:click.prevent="exportExcel" wire:loading.attr="disabled" class="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50">
+                    <svg wire:loading.remove wire:target="exportExcel" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                    
+                    <svg wire:loading wire:target="exportExcel" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
 
-                <span wire:loading.remove wire:target="exportExcel">Exportar para Excel</span>
-                <span wire:loading wire:target="exportExcel">Gerando Planilha...</span>
-            </button>
+                    <span wire:loading.remove wire:target="exportExcel">Exportar para Excel</span>
+                    <span wire:loading wire:target="exportExcel">Gerando Planilha...</span>
+                </button>
 
-            <button type="button" wire:click="$set('showImportModal', true)" class="px-4 py-2 bg-yellow-500 text-white text-sm font-semibold rounded-md hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                Importar CSV Unimed
-            </button>
+                <button type="button" wire:click="$set('showImportModal', true)" class="px-4 py-2 bg-yellow-500 text-white text-sm font-semibold rounded-md hover:bg-yellow-600 transition-colors shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Importar CSV Unimed
+                </button>
+                @endhasanyrole
+            </div>
         </div>
-    </div>
+    @endhasanyrole
 
     <div class="mb-6 flex flex-wrap gap-4">
         <div class="bg-white border border-gray-200 shadow-sm rounded-xl px-5 py-3 flex items-center gap-4 min-w-[200px] flex-1">
@@ -49,7 +53,7 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             </div>
             <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Consultas</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total - Atendimentos</p>
                 <p class="text-xl font-bold text-gray-900 leading-tight">{{ $totalConsultas }}</p>
             </div>
         </div>
@@ -59,7 +63,7 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <div>
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Sessões</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total - Sessões</p>
                 <p class="text-xl font-bold text-gray-900 leading-tight">{{ $totalSessoes ?? 0 }}</p>
             </div>
         </div>
@@ -87,8 +91,14 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Profissional</label>
-                    <select wire:model="professional_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                        <option value="">Todos</option>
+                    <select wire:model="professional_id" 
+                            class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm {{ !auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']) ? 'bg-gray-100 cursor-not-allowed opacity-75' : '' }}" 
+                            {{ !auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']) ? 'disabled' : '' }}>
+                        
+                        @hasanyrole('admin|manager|administrative')
+                            <option value="">Todos</option>
+                        @endhasanyrole
+                        
                         @foreach($professionals as $professional)
                             <option value="{{ $professional->id }}">{{ $professional->name }}</option>
                         @endforeach
@@ -201,7 +211,10 @@
                             @if($selectedColumns['profissional']) <th class="py-3 px-4">Profissional</th> @endif
                             @if($selectedColumns['registrado_em']) <th class="py-3 px-4">Registrado em</th> @endif
                             @if($selectedColumns['atualizado_em']) <th class="py-3 px-4">Atualizado em</th> @endif
-                            <th class="py-3 px-4 text-right">Ações</th>
+                            
+                            @hasanyrole('admin|manager|administrative')
+                                <th class="py-3 px-4 text-right">Ações</th>
+                            @endhasanyrole
                         </tr>   
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-800">
@@ -218,25 +231,28 @@
                                 @if($selectedColumns['profissional']) <td class="py-4 px-4 uppercase text-xs">{{ $appointment->professional?->name ?? '-' }}</td> @endif
                                 @if($selectedColumns['registrado_em']) <td class="py-4 px-4 text-xs">{{ $appointment->created_at ? $appointment->created_at->format('d/m/Y H:i') : '-' }}</td> @endif
                                 @if($selectedColumns['atualizado_em']) <td class="py-4 px-4 text-xs">{{ $appointment->updated_at ? $appointment->updated_at->format('d/m/Y H:i') : '-' }}</td> @endif
-                                <td class="py-4 px-4 text-right">
-                                    <div class="flex items-center justify-end gap-3">
-                                        <a href="{{ route('terapias-realizadas.edit', $appointment->id) }}" wire:navigate class="text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors">
-                                            Editar
-                                        </a>
-                                        <button 
-                                            type="button" 
-                                            wire:click="deleteAppointment({{ $appointment->id }})" 
-                                            wire:confirm="Tem certeza que deseja excluir esta consulta? Essa ação não pode ser desfeita."
-                                            class="text-red-500 hover:text-red-700 font-semibold text-xs transition-colors"
-                                        >
-                                            Excluir
-                                        </button>
-                                    </div>
-                                </td>
+                                
+                                @hasanyrole('admin|manager|administrative')
+                                    <td class="py-4 px-4 text-right">
+                                        <div class="flex items-center justify-end gap-3">
+                                            <a href="{{ route('terapias-realizadas.edit', $appointment->id) }}" wire:navigate class="text-blue-600 hover:text-blue-800 font-semibold text-xs transition-colors">
+                                                Editar
+                                            </a>
+                                            <button 
+                                                type="button" 
+                                                wire:click="deleteAppointment({{ $appointment->id }})" 
+                                                wire:confirm="Tem certeza que deseja excluir esta consulta? Essa ação não pode ser desfeita."
+                                                class="text-red-500 hover:text-red-700 font-semibold text-xs transition-colors"
+                                            >
+                                                Excluir
+                                            </button>
+                                        </div>
+                                    </td>
+                                @endhasanyrole
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="py-6 px-4 text-center text-gray-500">Nenhuma terapia encontrada com os filtros atuais.</td>
+                                <td colspan="12" class="py-6 px-4 text-center text-gray-500">Nenhuma terapia encontrada com os filtros atuais.</td>
                             </tr>
                         @endforelse
                     </tbody>

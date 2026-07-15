@@ -82,6 +82,26 @@ class Agenda extends Component
     {
         $this->validate();
 
+        $conflito = Schedule::where('professional_id', $this->professional_id)
+            ->where('day_of_week', $this->day_of_week)
+            ->when($this->editingScheduleId, function($query) {
+                return $query->where('id', '!=', $this->editingScheduleId);
+            })
+            ->where(function ($query) {
+                $query->where('start_time', '<', $this->end_time)
+                      ->where('end_time', '>', $this->start_time);
+            })
+            ->first();
+
+        if ($conflito) {
+            if ($conflito->is_blocked) {
+                $this->addError('professional_id', 'Erro: O profissional marcou este período como NÃO DISPONÍVEL.');
+            } else {
+                $this->addError('start_time', 'Erro: O profissional já possui outro paciente agendado neste horário.');
+            }
+            return;
+        }
+
         $data = [
             'day_of_week' => $this->day_of_week,
             'start_time' => $this->start_time,

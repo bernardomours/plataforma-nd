@@ -6,8 +6,10 @@ use Livewire\Component;
 use App\Models\Professional;
 use App\Models\Unit;
 use App\Models\Therapy;
+use App\Models\User;
 use App\Enums\ProfessionalRole;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Hash;
 
 #[Layout('layouts.app')]
 class Create extends Component
@@ -61,6 +63,29 @@ class Create extends Component
             $professional->therapies()->sync($this->selectedTherapies);
         }
 
+        if (!empty($this->email)) {
+            
+            $user = User::firstOrCreate(
+                ['email' => $this->email],
+                [
+                    'name' => $this->name,
+                    'password' => Hash::make('mudar123'),
+                    'birth_date' => $this->birth_date,
+                    'unit_id' => $this->selectedUnits[0] ?? null,
+                ]
+            );
+
+            if (!$user->hasRole('profissional')) {
+                $user->assignRole('profissional');
+            }
+
+            if (!empty($this->selectedUnits)) {
+                $user->units()->syncWithoutDetaching($this->selectedUnits);
+            }
+
+            $professional->update(['user_id' => $user->id]);
+        }
+
         return $professional;
     }
 
@@ -84,7 +109,6 @@ class Create extends Component
             'email', 'role', 'selectedUnits', 'selectedTherapies'
         ]);
         
-        // Emite o evento JavaScript para as tags azuis do TomSelect limparem no Front
         $this->dispatch('clear-tom-selects');
     }
 

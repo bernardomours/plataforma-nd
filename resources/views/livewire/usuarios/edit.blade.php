@@ -51,24 +51,37 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">Data de Nascimento</label>
                         <input wire:model="birth_date" type="date" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        @error('birth_date') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
                 </div>
 
                 <hr class="border-gray-100">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Função / Cargo <span class="text-red-500">*</span></label>
-                        <select wire:model="role" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                            <option value="admin">Administrador</option>
-                            <option value="manager">Gerência Geral</option>
-                            <option value="administrative">Administrativo</option>
-                            <option value="coordinator">Coordenação</option>
-                            <option value="supervisor">Supervisão</option>
-                        </select>
-                        @error('role') <span class="text-red-500 text-xs mt-1">{{ $message }}</span> @enderror
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Funções / Cargos de Acesso <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        @php
+                            $roleNames = [
+                                'admin' => 'Administrador',
+                                'manager' => 'Gerência Geral',
+                                'administrative' => 'Administrativo',
+                                'coordinator' => 'Coordenação',
+                                'supervisor' => 'Supervisão',
+                                'profissional' => 'Profissional',
+                            ];
+                        @endphp
+                        
+                        @foreach($todasRoles as $role)
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model="selected_roles" value="{{ $role->name }}" class="w-4 h-4 text-purple-600 bg-white border-gray-300 rounded focus:ring-purple-500">
+                                <span class="text-sm font-medium text-gray-700">{{ $roleNames[$role->name] ?? ucfirst($role->name) }}</span>
+                            </label>
+                        @endforeach
                     </div>
+                    @error('selected_roles') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                </div>
 
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Acesso ao Financeiro (Produção)</label>
                         <label class="inline-flex items-center cursor-pointer">

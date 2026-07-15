@@ -129,7 +129,9 @@
                         <th class="py-3 px-4">Carteira</th>
                         <th class="py-3 px-4">Unidade</th>
                         <th class="py-3 px-4">Status</th>
-                        <th class="py-3 px-4 text-center">Ações</th>
+                        @hasanyrole('admin|manager|administrative|profissional')
+                            <th class="py-3 px-4 text-center">Ações</th>
+                        @endhasanyrole
                     </tr>   
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-sm text-gray-700">
@@ -144,7 +146,7 @@
                                     {{ $paciente->name }}
                                     @if($paciente->trashed())
                                         <span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                                            Excluído
+                                            Inativo
                                         </span>
                                     @endif
                                 </div>
@@ -170,61 +172,71 @@
                                 @endif
                             </td>
                             
-                            <td class="py-3 px-4 text-center">
-                                @if($paciente->trashed())
-                                    <div class="flex items-center justify-center gap-3">
-                                        <button wire:click="restorePatient({{ $paciente->id }})" wire:confirm="Deseja restaurar este paciente?" class="inline-flex items-center text-green-600 hover:text-green-800 font-semibold text-sm">
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-                                            Restaurar
-                                        </button>
-                                        
-                                        <button wire:click="forceDeletePatient({{ $paciente->id }})" wire:confirm="ATENÇÃO: Esta ação é irreversível e excluirá o paciente definitivamente do banco de dados. Deseja continuar?" class="inline-flex items-center text-red-600 hover:text-red-800 font-semibold text-sm">
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            Excluir
-                                        </button>
-                                    </div>
-                                @else
-                                    <div x-data="{ open: false }" @click.outside="open = false" class="relative inline-block text-left">
-                                        
-                                        <button @click="open = !open" class="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded-full hover:bg-gray-100 transition-colors">
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
-                                        </button>
-
-                                        <div x-show="open" 
-                                            x-transition:enter="transition ease-out duration-100" 
-                                            x-transition:enter-start="transform opacity-0 scale-95" 
-                                            x-transition:enter-end="transform opacity-100 scale-100" 
-                                            x-transition:leave="transition ease-in duration-75" 
-                                            x-transition:leave-start="transform opacity-100 scale-100" 
-                                            x-transition:leave-end="transform opacity-0 scale-95" 
-                                            class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-50"
-                                            style="display: none;">
-                                            
-                                            <div class="py-1">
-                                                <a href="{{ route('pacientes.edit', $paciente->id) }}" wire:navigate class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
-                                                    <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                                    Editar
-                                                </a>
+                            @hasanyrole('admin|manager|administrative|profissional')
+                                <td class="py-3 px-4 text-center">
+                                    @if($paciente->trashed())
+                                        @hasanyrole('admin|manager|administrative')
+                                            <div class="flex items-center justify-center gap-3">
+                                                <button wire:click="restorePatient({{ $paciente->id }})" wire:confirm="Deseja restaurar este paciente?" class="inline-flex items-center text-green-600 hover:text-green-800 font-semibold text-sm">
+                                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                                                    Restaurar
+                                                </button>
                                                 
-                                                <a href="{{ route('pacientes.agenda', $paciente->id) }}" class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
-                                                    <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                                    Agenda
-                                                </a>
-                                                
-                                                <a href="{{ route('pacientes.carga-horaria', $paciente->id) }}" class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
-                                                    <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                                                    Cargas Horárias
-                                                </a>
-                                                
-                                                <button type="button" wire:click="openFrequenciaModal({{ $paciente->id }})" class="w-full text-left group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
-                                                    <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                    Emitir Frequência - Unidade
+                                                <button wire:click="forceDeletePatient({{ $paciente->id }})" wire:confirm="ATENÇÃO: Esta ação é irreversível e excluirá o paciente definitivamente do banco de dados. Deseja continuar?" class="inline-flex items-center text-red-600 hover:text-red-800 font-semibold text-sm">
+                                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                    Excluir
                                                 </button>
                                             </div>
+                                        @else
+                                            <span class="text-xs text-gray-400">-</span>
+                                        @endhasanyrole
+                                    @else
+                                        <div x-data="{ open: false }" @click.outside="open = false" class="relative inline-block text-left">
+                                            
+                                            <button @click="open = !open" class="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded-full hover:bg-gray-100 transition-colors">
+                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                                            </button>
+
+                                            <div x-show="open" 
+                                                x-transition:enter="transition ease-out duration-100" 
+                                                x-transition:enter-start="transform opacity-0 scale-95" 
+                                                x-transition:enter-end="transform opacity-100 scale-100" 
+                                                x-transition:leave="transition ease-in duration-75" 
+                                                x-transition:leave-start="transform opacity-100 scale-100" 
+                                                x-transition:leave-end="transform opacity-0 scale-95" 
+                                                class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-50"
+                                                style="display: none;">
+                                                
+                                                <div class="py-1">
+                                                    @hasanyrole('admin|manager|administrative')
+                                                        <a href="{{ route('pacientes.edit', $paciente->id) }}" wire:navigate class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                                                            <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                                            Editar
+                                                        </a>
+                                                    @endhasanyrole
+                                                    
+                                                    <a href="{{ route('pacientes.agenda', $paciente->id) }}" class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                                                        <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                                        Agenda
+                                                    </a>
+                                                    
+                                                    @hasanyrole('admin|manager|administrative')
+                                                        <a href="{{ route('pacientes.carga-horaria', $paciente->id) }}" class="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                                                            <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                                                            Cargas Horárias
+                                                        </a>
+                                                        
+                                                        <button type="button" wire:click="openFrequenciaModal({{ $paciente->id }})" class="w-full text-left group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                                                            <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                            Emitir Frequência - Unidade
+                                                        </button>
+                                                    @endhasanyrole
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                @endif
-                            </td>
+                                    @endif
+                                </td>
+                            @endhasanyrole
                         </tr>
                     @endforeach
                 </tbody>
@@ -255,7 +267,7 @@
                                     Registrar Saída do(s) Paciente(s)
                                 </h3>
                                 <p class="text-sm text-gray-500 text-center mb-5">
-                                    Os {{ count($selected) }} paciente(s) selecionado(s) ficarão inativos no sistema. O motivo abaixo será aplicado a todos eles.
+                                    Os {{ count($selected) }} paciente(s) selecionado(s) ficarão inativos no system. O motivo abaixo será aplicado a todos eles.
                                 </p>
 
                                 <div class="space-y-4">

@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -59,27 +60,32 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->hasRole('admin');
     }
 
     public function isManager(): bool
     {
-        return $this->role === 'manager';
+        return $this->hasRole('manager');
     }
 
     public function isAdministrative(): bool
     {
-        return $this->role === 'administrative';
+        return $this->hasRole('administrative');
     }
 
     public function isCoordinator(): bool
     {
-        return $this->role === 'coordinator';
+        return $this->hasRole('coordinator');
     }
 
     public function isSupervisor(): bool
     {
-        return $this->role === 'supervisor';
+        return $this->hasRole('supervisor');
+    }
+
+    public function professional()
+    {
+        return $this->hasOne(Professional::class, 'user_id');
     }
 
     public function getAllowedUnitIds(): ?array
@@ -89,14 +95,5 @@ class User extends Authenticatable
         }
 
         return $this->units()->pluck('units.id')->toArray();
-    }
-
-    public function hasRole($roles): bool
-    {
-        if (is_array($roles)) {
-            return in_array($this->role, $roles);
-        }
-
-        return $this->role === $roles;
     }
 }

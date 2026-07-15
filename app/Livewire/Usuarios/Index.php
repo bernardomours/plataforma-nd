@@ -58,7 +58,8 @@ class Index extends Component
 
     public function render()
     {
-        $usuarios = User::with('units')
+        // Otimização: Carrega 'roles' do Spatie para evitar o problema N+1 Query
+        $usuarios = User::with(['units', 'roles'])
             ->when($this->filtroStatus === 'excluidos', function ($query) {
                 return $query->onlyTrashed();
             })

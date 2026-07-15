@@ -7,6 +7,7 @@ use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\Unit;
+use Spatie\Permission\Models\Role;
 
 #[Layout('layouts.app')]
 class Edit extends Component
@@ -15,9 +16,9 @@ class Edit extends Component
 
     public $name = '';
     public $email = '';
-    public $password = ''; // Opcional na edição
+    public $password = '';
     public $birth_date = '';
-    public $role = '';
+    public $selected_roles = []; 
     public $can_access_production = false;
     public $selected_units = [];
 
@@ -31,21 +32,22 @@ class Edit extends Component
         $this->name = $user->name;
         $this->email = $user->email;
         $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
-        $this->role = $user->role;
         $this->can_access_production = (bool) $user->can_access_production;
         
-        // Puxa as unidades que o utilizador já tem associadas
         $this->selected_units = $user->units->pluck('id')->toArray();
+        
+        // Puxa as roles que o usuário já tem através do Spatie
+        $this->selected_roles = $user->roles->pluck('name')->toArray();
     }
 
     public function update()
     {
         $this->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email' . (isset($this->user) ? ',' . $this->user->id : ''),
-            'password' => isset($this->user) ? 'nullable|string|min:8' : 'required|string|min:8',
+            'email' => 'required|email|unique:users,email,' . $this->user->id,
+            'password' => 'nullable|string|min:8',
             'birth_date' => 'required|date', 
-            'role' => 'required|string',
+            'selected_roles' => 'required|array|min:1', // Exige pelo menos um cargo
             'selected_units' => 'nullable|array', 
         ]);
 
@@ -53,18 +55,19 @@ class Edit extends Component
             'name' => $this->name,
             'email' => $this->email,
             'birth_date' => $this->birth_date,
-            'role' => $this->role,
             'can_access_production' => $this->can_access_production,
             'unit_id' => $this->selected_units[0] ?? null,
         ];
 
-        // Só atualiza a senha se um novo valor foi introduzido
         if (!empty($this->password)) {
             $data['password'] = Hash::make($this->password);
         }
 
         $this->user->update($data);
+        
+        // Atualiza as ligações
         $this->user->units()->sync($this->selected_units);
+        $this->user->syncRoles($this->selected_roles); // Sincroniza os crachás
 
         session()->flash('message', 'Usuário atualizado com sucesso.');
         return redirect()->route('usuarios.index');
@@ -74,6 +77,7 @@ class Edit extends Component
     {
         return view('livewire.usuarios.edit', [
             'unidades' => Unit::orderBy('city')->get(),
+            'todasRoles' => Role::all(), // Envia as roles oficiais para a tela
         ]);
     }
 }
