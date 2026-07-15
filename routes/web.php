@@ -101,104 +101,102 @@ Route::middleware(['auth', 'producao.access'])->prefix('producao')->group(functi
     })->name('producao.sair');
 });
 
-Route::get('/sincronizar-profissionais', function () {
-    if (!auth()->user()->hasRole('admin')) {
-        abort(403, 'Acesso restrito a administradores.');
-    }
+Route::middleware('auth')->group(function () {
 
-    $profissionais = Professional::with('units')->get();
-    $criados = 0;
-    $atualizados = 0;
-
-    foreach($profissionais as $prof) {
-        if(empty($prof->email)) {
-            continue;
+    Route::get('/migrar-roles-usuarios', function () {
+        if (auth()->user()->role !== 'admin' && !auth()->user()->hasRole('admin')) {
+            abort(403, 'Acesso restrito a administradores.');
         }
 
-        $user = User::where('email', $prof->email)->first();
-        
-        $unidadesIds = $prof->units->pluck('id')->toArray();
+        $users = User::all();
+        $migrados = 0;
 
-        if(!$user) {
-            $user = User::create([
-                'name' => $prof->name,
-                'email' => $prof->email,
-                'password' => \Illuminate\Support\Facades\Hash::make('mudar123'),
-                'birth_date' => $prof->birth_date,
-                'unit_id' => $unidadesIds[0] ?? null, 
-            ]);
-            $criados++;
+        foreach ($users as $user) {
+            if (!empty($user->role)) {
+                $role = Role::firstOrCreate(['name' => $user->role]);
+                $user->assignRole($role);
+                $migrados++;
+            }
         }
 
-        if(!$user->hasRole('profissional')) {
-            $user->assignRole('profissional');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return "<h1>Migração de Cargos Concluída!</h1>
+                <p><strong>{$migrados}</strong> usuários tiveram seus cargos antigos migrados para as novas tabelas com sucesso.</p>
+                <hr>
+                <h2 style='color: red;'>⚠️ IMPORTANTE: Volte no web.php e APAGUE esta rota imediatamente por motivos de segurança!</h2>";
+    });
+
+    Route::get('/sincronizar-profissionais', function () {
+        if (auth()->user()->role !== 'admin' && !auth()->user()->hasRole('admin')) {
+            abort(403, 'Acesso restrito a administradores.');
         }
 
-        if (!empty($unidadesIds)) {
-            $user->units()->syncWithoutDetaching($unidadesIds);
+        $profissionais = Professional::with('units')->get();
+        $criados = 0;
+        $atualizados = 0;
+
+        foreach($profissionais as $prof) {
+            if(empty($prof->email)) continue;
+
+            $user = User::where('email', $prof->email)->first();
+            $unidadesIds = $prof->units->pluck('id')->toArray();
+
+            if(!$user) {
+                $user = User::create([
+                    'name' => $prof->name,
+                    'email' => $prof->email,
+                    'password' => \Illuminate\Support\Facades\Hash::make('mudar123'),
+                    'birth_date' => $prof->birth_date,
+                    'unit_id' => $unidadesIds[0] ?? null, 
+                ]);
+                $criados++;
+            }
+
+            if(!$user->hasRole('profissional')) {
+                $user->assignRole('profissional');
+            }
+
+            if (!empty($unidadesIds)) {
+                $user->units()->syncWithoutDetaching($unidadesIds);
+            }
+
+            if (empty($prof->user_id)) {
+                $prof->update(['user_id' => $user->id]);
+                $atualizados++;
+            }
         }
 
-        if (empty($prof->user_id)) {
-            $prof->update(['user_id' => $user->id]);
-            $atualizados++;
+        return "<h1>Sincronização Concluída com Unidades! 🏢</h1>
+                <p><strong>{$criados}</strong> novos usuários criados.</p>
+                <p><strong>{$atualizados}</strong> profissionais vinculados aos seus usuários.</p>
+                <hr>
+                <h2 style='color: red;'>⚠️ IMPORTANTE: Volte no web.php e APAGUE esta rota agora por motivos de segurança!</h2>";
+    });
+
+    Route::get('/limpar-cargos-errados', function () {
+        if (auth()->user()->role !== 'admin' && !auth()->user()->hasRole('admin')) {
+            abort(403, 'Acesso restrito a administradores.');
         }
-    }
 
-    return "<h1>Sincronização Concluída com Unidades! 🏢</h1>
-            <p><strong>{$criados}</strong> novos usuários criados.</p>
-            <p><strong>{$atualizados}</strong> profissionais vinculados aos seus usuários.</p>
-            <hr>
-            <h2 style='color: red;'>⚠️ IMPORTANTE: Volte no web.php e APAGUE esta rota agora por motivos de segurança!</h2>";
-});
+        $usuarios = User::role('profissional')->get();
+        $limpos = 0;
 
-Route::get('/migrar-roles-usuarios', function () {
-    if (auth()->user()->role !== 'admin' && !auth()->user()->hasRole('admin')) {
-        abort(403, 'Acesso restrito a administradores.');
-    }
-
-    $users = User::all();
-    $migrados = 0;
-
-    foreach ($users as $user) {
-        if (!empty($user->role)) {
-            $role = Role::firstOrCreate(['name' => $user->role]);
-            
-            $user->assignRole($role);
-            $migrados++;
+        foreach ($usuarios as $user) {
+            if ($user->hasRole('administrative')) {
+                $user->removeRole('administrative');
+                $limpos++;
+            }
         }
-    }
 
-    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
-    return "<h1>Migração de Cargos Concluída!</h1>
-            <p><strong>{$migrados}</strong> usuários tiveram seus cargos antigos migrados para as novas tabelas com sucesso.</p>
-            <hr>
-            <h2 style='color: red;'>⚠️ IMPORTANTE: Volte no web.php e APAGUE esta rota imediatamente por motivos de segurança!</h2>";
-});
+        return "<h1>Limpeza Concluída! 🧹</h1>
+                <p><strong>{$limpos}</strong> profissionais tiveram o cargo 'Administrativo' acidental removido.</p>
+                <hr>
+                <h2 style='color: red;'>⚠️ Você já pode apagar esta rota do web.php!</h2>";
+    });
 
-Route::get('/limpar-cargos-errados', function () {
-    if (!auth()->user()->hasRole('admin')) {
-        abort(403, 'Acesso restrito a administradores.');
-    }
-
-    $usuarios = User::role('profissional')->get();
-    $limpos = 0;
-
-    foreach ($usuarios as $user) {
-        if ($user->hasRole('administrative')) {
-            $user->removeRole('administrative');
-            $limpos++;
-        }
-    }
-
-    // Limpa o cache do Spatie
-    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-
-    return "<h1>Limpeza Concluída! 🧹</h1>
-            <p><strong>{$limpos}</strong> profissionais tiveram o cargo 'Administrativo' acidental removido.</p>
-            <hr>
-            <p><strong>Aviso:</strong> Se você (ou outro gestor) precisar ser Profissional <strong>E</strong> Administrativo simultaneamente, basta ir na tela de Edição de Usuários no sistema e marcar a caixinha novamente!</p>
-            <h2 style='color: red;'>⚠️ Você já pode apagar esta rota do web.php!</h2>";
 });
 
 require __DIR__.'/auth.php';
