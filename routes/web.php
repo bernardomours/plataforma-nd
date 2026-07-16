@@ -3,10 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-use Spatie\Permission\Models\Role;
-use App\Models\Professional;
-use Illuminate\Support\Facades\Hash;
 use App\Livewire\Pacientes\Index as PacientesIndex;
 use App\Livewire\Pacientes\Create as PacientesCreate;
 use App\Livewire\Pacientes\Edit as PacientesEdit;
@@ -62,7 +58,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // TERAPIAS REALIZADAS
     Route::get('/terapias-realizadas', TerapiasRealizadasIndex::class)->name('terapias-realizadas.index');
     
-    // FREQUENCIA - CORRIGIDO AQUI (Uso do pipe | em vez de vírgula)
+    // FREQUENCIA
     Route::middleware('role:admin|manager|administrative')->group(function () {
         Route::get('/terapias-realizadas/cadastrar', TerapiasRealizadasCreate::class)->name('terapias-realizadas.create');
         Route::get('/terapias-realizadas/{id}/editar', TerapiasRealizadasEdit::class)->name('terapias-realizadas.edit');
