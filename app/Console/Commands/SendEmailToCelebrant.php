@@ -34,49 +34,41 @@ class SendEmailToCelebrant extends Command
         try {
             $hoje = Carbon::today();
 
-            // Busca aniversariantes em Users (Singular)
-            $users = User::with('unit')->whereMonth('birth_date', $hoje->month)
+            $users = User::with('units')->whereMonth('birth_date', $hoje->month)
                               ->whereDay('birth_date', $hoje->day)
                               ->get()
                               ->each(fn($item) => $item->tipo_pessoa = 'Usuário(s)');
 
-            // Busca aniversariantes em Professionals (AGORA NO PLURAL: 'units')
             $professionals = Professional::with('units')->whereMonth('birth_date', $hoje->month)
                                       ->whereDay('birth_date', $hoje->day)
                                       ->get()
                                       ->each(fn($item) => $item->tipo_pessoa = 'Profissional(is)');
 
-            // Busca aniversariantes em Patients (Singular)
             $patients = Patient::with('unit')->whereMonth('birth_date', $hoje->month)
                                  ->whereDay('birth_date', $hoje->day)
                                  ->get()
                                  ->each(fn($item) => $item->tipo_pessoa = 'Paciente(s)');
 
-            // Junta todos em uma única coleção
             $todosAniversariantes = collect([])->merge($users)->merge($professionals)->merge($patients);
 
             if ($todosAniversariantes->isEmpty()) {
                 $this->info('Nenhum aniversariante hoje.');
                 return;
             }
-
-            // === A MÁGICA DO FILTRO INTELIGENTE ===
-            // Separa os aniversariantes por unidade entendendo quem é Multi-Unidades
             
             $aniversariantesMossoro = $todosAniversariantes->filter(function ($item) {
-                if ($item instanceof Professional) {
-                    return $item->units->contains('id', 1); // Verifica se Mossoró tá na lista dele
+                if ($item instanceof Professional || $item instanceof User) {
+                    return $item->units->contains('id', 1);
                 }
-                return $item->unit_id == 1; // Para Pacientes e Users, continua normal
+                return $item->unit_id == 1;
             });
 
             $aniversariantesNatal = $todosAniversariantes->filter(function ($item) {
-                if ($item instanceof Professional) {
-                    return $item->units->where('id', '!=', 1)->isNotEmpty(); // Verifica se tem outras unidades
+                if ($item instanceof Professional || $item instanceof User) {
+                    return $item->units->where('id', '!=', 1)->isNotEmpty(); 
                 }
                 return $item->unit_id != 1;
             });
-            // ======================================
 
             // Lógica para Unidade Mossoró
             if ($aniversariantesMossoro->isNotEmpty()) {

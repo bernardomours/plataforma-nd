@@ -72,14 +72,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/relatorio-geral', RelatorioGeral::class)->middleware('role:admin|manager')->name('relatorios.geral');
-    Route::get('/auditoria-humana', AtendimentoHumanaIndex::class)->middleware('role:admin|manager')->name('auditoria.humana');
-
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/usuarios', UsuariosIndex::class)->name('usuarios.index');
         Route::get('/usuarios/criar', UsuariosCreate::class)->name('usuarios.create');
         Route::get('/usuarios/{user}/editar', UsuariosEdit::class)->name('usuarios.edit');
         Route::get('/controles', ControlesIndex::class)->name('controles.index');
+        Route::get('/auditoria-humana', AtendimentoHumanaIndex::class)->middleware('role:admin|manager')->name('auditoria.humana');
     });
 });
     
