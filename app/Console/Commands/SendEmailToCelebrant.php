@@ -34,7 +34,9 @@ class SendEmailToCelebrant extends Command
         try {
             $hoje = Carbon::today();
 
-            $users = User::with('units')->whereMonth('birth_date', $hoje->month)
+            $users = User::with('units')
+                              ->whereDoesntHave('professional')
+                              ->whereMonth('birth_date', $hoje->month)
                               ->whereDay('birth_date', $hoje->day)
                               ->get()
                               ->each(fn($item) => $item->tipo_pessoa = 'Usuário(s)');
