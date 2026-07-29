@@ -12,35 +12,20 @@ class QualityChecklist extends Model
     protected $fillable = [
         'quality_process_id',
         'description',
-        'due_date',
         'is_completed',
-        'completed_by',
+        'due_date',
         'completed_at',
+        'completed_by',
     ];
 
     protected $casts = [
         'is_completed' => 'boolean',
+        'due_date' => 'date',
         'completed_at' => 'datetime',
     ];
 
     public function process()
     {
         return $this->belongsTo(QualityProcess::class, 'quality_process_id');
-    }
-
-    public function completedBy()
-    {
-        return $this->belongsTo(User::class, 'completed_by');
-    }
-
-    protected static function booted()
-    {
-        static::saved(function ($checklist) {
-            $checklist->process->recalculateProgress();
-        });
-
-        static::deleted(function ($checklist) {
-            $checklist->process->recalculateProgress();
-        });
     }
 }

@@ -1,65 +1,30 @@
 <?php
 
-namespace App\Models;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class QualityProcess extends Model
+return new class extends Migration
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'sector',
-        'process_name',
-        'procedure_code',
-        'due_date',
-        'status',
-        'progress',
-        'created_by',
-    ];
-
-    protected $casts = [
-        'due_date' => 'date',
-    ];
-
-    public function users()
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
     {
-        return $this->belongsToMany(User::class, 'quality_process_user');
+        Schema::create('quality_process_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('quality_process_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            
+            $table->timestamps();
+        });
     }
 
-    public function checklists()
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
     {
-        return $this->hasMany(QualityChecklist::class);
+        Schema::dropIfExists('quality_process_user');
     }
-
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function recalculateProgress()
-    {
-        $total = $this->checklists()->count();
-
-        if ($total === 0) {
-            $this->update(['progress' => 0]);
-            return;
-        }
-
-        $completed = $this->checklists()->where('is_completed', true)->count();
-        $percentage = (int) round(($completed / $total) * 100);
-
-        $status = $this->status;
-        if ($percentage === 100) {
-            $status = 'concluido';
-        } elseif ($percentage > 0 && $status === 'pendente') {
-            $status = 'em_andamento';
-        }
-
-        $this->update([
-            'progress' => $percentage,
-            'status' => $status
-        ]);
-    }
-}
+};
