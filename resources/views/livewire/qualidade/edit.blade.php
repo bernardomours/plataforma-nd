@@ -45,9 +45,9 @@
                     @error('process_name') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
                 </div>
 
-                <!-- Prazo Final -->
                 <div>
-                    <label for="due_date" class="block text-sm font-semibold text-gray-700 mb-1">Prazo Final</label>
+                    <label for="due_date" class="block text-sm font-semibold text-gray-700 mb-1">Prazo Final (1ª Etapa)</label>
+                    <p class="text-xs text-gray-500 mt-0.5 mb-2">Os próximos passos terão +30 dias automaticamente.</p>
                     <input type="date" wire:model="due_date" id="due_date" 
                            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors {{ $errors->has('due_date') ? 'border-red-500' : '' }}">
                     @error('due_date') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror

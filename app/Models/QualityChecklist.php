@@ -12,6 +12,7 @@ class QualityChecklist extends Model
     protected $fillable = [
         'quality_process_id',
         'description',
+        'due_date',
         'is_completed',
         'completed_by',
         'completed_at',

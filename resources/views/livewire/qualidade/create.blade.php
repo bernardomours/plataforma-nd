@@ -32,11 +32,12 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">Prazo Final</label>
+                <label class="block text-sm font-medium text-gray-700">Prazo Final (1ª Etapa)</label>
+                <p class="text-xs text-gray-500 mt-0.5 mb-1">Os próximos passos terão +30 dias automaticamente.</p>
                 <input type="date" wire:model="due_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                 @error('due_date') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
             </div>
-        </div>
+        </div>  
 
         <hr class="border-gray-200">
 

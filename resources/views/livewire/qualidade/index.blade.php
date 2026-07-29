@@ -14,12 +14,10 @@
     </div>
     @endhasanyrole
 
-    <!-- Lista de Processos (Cards) -->
     <div class="space-y-6">
         @forelse($processes as $process)
             <div class="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
                 
-                <!-- Topo do Card: Formato Planilha -->
                 <div class="bg-gray-50 border-b border-gray-200 p-4 sm:px-6">
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
                         <div>
@@ -38,9 +36,9 @@
                             </p>
                         </div>
                         <div>
-                            <span class="text-xs font-semibold text-gray-500 uppercase">Prazo Final</span>
-                            <p class="text-sm font-medium {{ $process->due_date && $process->due_date->isPast() && $process->progress < 100 ? 'text-red-600 font-bold' : 'text-gray-900' }}">
-                                {{ $process->due_date ? $process->due_date->format('d/m/Y') : '-' }}
+                            <span class="text-xs font-semibold text-gray-500 uppercase">Data Base (1º Passo)</span>
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ $process->due_date ? \Carbon\Carbon::parse($process->due_date)->format('d/m/Y') : '-' }}
                             </p>
                         </div>
                         <div class="flex items-center justify-end space-x-3">
@@ -67,7 +65,6 @@
                                 {{ ucfirst(str_replace('_', ' ', $process->status)) }}
                             </span>
                             
-                            <!-- Círculo de % Inspirado na Imagem -->
                             <div class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-sm transition-colors duration-500
                                 {{ $process->progress == 100 ? 'bg-green-500' : 'bg-indigo-500' }}">
                                 {{ $process->progress }}%
@@ -76,7 +73,6 @@
                     </div>
                 </div>
 
-                <!-- Corpo do Card: A Linha do Tempo (Timeline) -->
                 <div class="p-6 overflow-x-auto">
                     @if($process->checklists->count() > 0)
                         <div class="flex items-start min-w-[600px]">
@@ -85,12 +81,10 @@
                                     // REGRA DE TRAVA VISUAL
                                     $canClick = true;
                                     if (!$checklist->is_completed) {
-                                        // Bloqueia marcar se o anterior não estiver feito
                                         if ($index > 0 && !$process->checklists[$index - 1]->is_completed) {
                                             $canClick = false;
                                         }
                                     } else {
-                                        // Bloqueia desmarcar se o próximo já estiver feito
                                         if ($index < ($process->checklists->count() - 1) && $process->checklists[$index + 1]->is_completed) {
                                             $canClick = false;
                                         }
@@ -99,7 +93,6 @@
 
                                 <div class="flex-1 relative text-center group">
                                     
-                                    <!-- Linha Conectora -->
                                     @if(!$loop->last)
                                         <div class="absolute top-5 left-[50%] w-full h-1.5 bg-gray-200 rounded">
                                             @if($checklist->is_completed)
@@ -110,7 +103,6 @@
                                         </div>
                                     @endif
 
-                                    <!-- O Nodo (Círculo Interativo) -->
                                     <button @if($canClick) wire:click="toggleChecklist({{ $checklist->id }})" @endif
                                             class="relative z-10 w-10 h-10 mx-auto rounded-full flex items-center justify-center border-4 border-white shadow-sm transition-all duration-200 focus:outline-none
                                             @if($checklist->is_completed)
@@ -120,28 +112,29 @@
                                             @endif">
                                         
                                         @if($checklist->is_completed)
-                                            <!-- Ícone de Check -->
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
                                             </svg>
                                         @else
-                                            <!-- Número do Passo -->
                                             <span class="text-sm font-semibold">{{ $index + 1 }}</span>
                                         @endif
                                     </button>
 
-                                    <!-- Textos abaixo do Nodo -->
-                                    <div class="mt-4 px-2">
+                                    <div class="mt-4 px-2 flex flex-col items-center">
                                         @if($checklist->is_completed)
-                                            <p class="text-xs font-bold text-green-600 mb-1">
-                                                {{ $checklist->completed_at ? $checklist->completed_at->format('d/m') : 'Feito' }}
+                                            <span class="text-[10px] font-semibold text-green-600 uppercase tracking-wider mb-0.5">Concluído</span>
+                                            <p class="text-xs font-bold text-green-700 mb-1">
+                                                {{ $checklist->completed_at ? \Carbon\Carbon::parse($checklist->completed_at)->format('d/m/Y') : 'Feito' }}
                                             </p>
                                         @else
-                                            <p class="text-xs font-medium text-gray-400 mb-1">Pendente</p>
+                                            <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Prazo</span>
+                                            <p class="text-xs font-medium {{ $checklist->due_date && \Carbon\Carbon::parse($checklist->due_date)->endOfDay()->isPast() ? 'text-red-500 font-bold' : 'text-gray-500' }} mb-1">
+                                                {{ $checklist->due_date ? \Carbon\Carbon::parse($checklist->due_date)->format('d/m/Y') : '-' }}
+                                            </p>
                                         @endif
                                         
-                                        <h4 class="text-[11px] uppercase font-bold transition-all duration-200
-                                            {{ $checklist->is_completed ? 'text-green-600 line-through opacity-70' : 'text-gray-500' }}">
+                                        <h4 class="text-[11px] uppercase font-bold transition-all duration-200 mt-1
+                                            {{ $checklist->is_completed ? 'text-green-600 line-through opacity-70' : 'text-gray-600' }}">
                                             {{ $checklist->description }}
                                         </h4>
                                     </div>

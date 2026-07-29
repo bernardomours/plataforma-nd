@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use App\Models\QualityProcess;
 use App\Models\User;
+use Carbon\Carbon;
 
 #[Layout('layouts.app')]
 class Create extends Component
@@ -23,11 +24,11 @@ class Create extends Component
     public function mount()
     {
         $this->checklists = [
+            ['description' => 'Não Iniciado'],
             ['description' => 'Em elaboração'],
-            ['description' => 'Elaborado'],
             ['description' => 'Em implementação'],
+            ['description' => 'Treinado'],
             ['description' => 'Auditado'],
-            ['description' => 'Em treinamento'],
             ['description' => 'Concluído'],
         ];
     }
@@ -59,7 +60,7 @@ class Create extends Component
             'sector' => $this->sector,
             'process_name' => $this->process_name,
             'procedure_code' => $this->procedure_code,
-            'due_date' => $this->due_date,
+            'due_date' => $this->due_date, 
             'created_by' => auth()->id(),
             'status' => 'pendente',
             'progress' => 0,
@@ -67,9 +68,14 @@ class Create extends Component
 
         $process->users()->attach($this->selectedUsers);
 
-        foreach ($this->checklists as $item) {
+        $dataBase = $this->due_date ? Carbon::parse($this->due_date) : null;
+
+        foreach ($this->checklists as $index => $item) {
+            $dataDaEtapa = $dataBase ? $dataBase->copy()->addDays($index * 30) : null;
+
             $process->checklists()->create([
-                'description' => $item['description']
+                'description' => $item['description'],
+                'due_date' => $dataDaEtapa ? $dataDaEtapa->format('Y-m-d') : null,
             ]);
         }
 
