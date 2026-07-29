@@ -45,6 +45,11 @@ class Agenda extends Component
         $this->isModalOpen = true;
     }
 
+    public function updatedTherapyId()
+    {
+        $this->professional_id = ''; 
+    }
+
     public function closeModal()
     {
         $this->isModalOpen = false;
@@ -136,11 +141,21 @@ class Agenda extends Component
             ->get()
             ->groupBy('day_of_week');
 
+        $professionalsQuery = Professional::query();
+
+        if (!empty($this->therapy_id)) {
+            $professionalsQuery->whereHas('therapies', function($q) {
+                $q->where('therapies.id', $this->therapy_id);
+            });
+        } else {
+            $professionalsQuery->where('id', '<', 0); 
+        }
+
         return view('livewire.pacientes.agenda', [
             'schedulesGrouped' => $schedules,
-            'professionals' => Professional::all(), 
-            'therapies' => Therapy::all(),         
-            'serviceTypes' => ServiceType::all(),   
+            'professionals' => $professionalsQuery->orderBy('name')->get(), 
+            'therapies' => Therapy::orderBy('name')->get(),        
+            'serviceTypes' => ServiceType::orderBy('name')->get(),  
         ]);
     }
 }
