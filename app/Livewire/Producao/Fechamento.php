@@ -10,25 +10,23 @@ use App\Models\Appointment;
 use App\Models\Therapy;
 use App\Models\Unit;
 use Carbon\Carbon;
+use App\Models\ProfessionalPaymentRule;
 
 #[Layout('layouts.producao')]
 class Fechamento extends Component
 { 
     use WithPagination;
 
-    // Filtros
     public $mes;
     public $ano;
     public $profissional_id = '';
     public $terapia_id = '';
     public $unidade_id = '';
 
-    // Controle do Modal de Extrato
     public $modalExtratoAberto = false;
     public $profissionalExtratoNome = '';
     public $extratoAtendimentos = [];
 
-    // Cache local para não recalcular o mesmo profissional várias vezes na mesma requisição
     protected $cacheProducao = [];
 
     public function mount()
@@ -39,7 +37,6 @@ class Fechamento extends Component
 
     public function updating($property)
     {
-        // Reseta a paginação e o cache sempre que um filtro for alterado
         if (in_array($property, ['mes', 'ano', 'profissional_id', 'terapia_id', 'unidade_id'])) {
             $this->resetPage();
             $this->cacheProducao = [];
@@ -54,17 +51,14 @@ class Fechamento extends Component
         $this->resetPage();
     }
 
-    // --- LÓGICA MATEMÁTICA DE APURAÇÃO ---
     public function getResumoProducao($prof)
     {
-        // 1. Buscar os atendimentos do profissional no período filtrado
-        $query = \App\Models\Appointment::where('professional_id', $prof->id)
+        $query = Appointment::where('professional_id', $prof->id)
             ->whereYear('appointment_date', $this->ano)
             ->whereMonth('appointment_date', $this->mes)
-            ->whereNotNull('check_in')  // Usa a coluna correta
-            ->whereNotNull('check_out'); // Usa a coluna correta
+            ->whereNotNull('check_in') 
+            ->whereNotNull('check_out');
 
-        // Aplica os filtros da tela se estiverem preenchidos
         if ($this->terapia_id) {
             $query->where('therapy_id', $this->terapia_id);
         }
@@ -74,38 +68,38 @@ class Fechamento extends Component
 
         $atendimentos = $query->get();
 
-        // Se não atendeu ninguém, retorna zerado
         if ($atendimentos->isEmpty()) {
             return ['sessoes' => 0, 'valor_regra' => 'Sem produção', 'valor_total' => 0];
         }
 
-        // 2. Buscar a regra de pagamento (buscando a regra padrão geral do profissional)
-        $regra = \App\Models\ProfessionalPaymentRule::where('professional_id', $prof->id)
+        $regra = ProfessionalPaymentRule::where('professional_id', $prof->id)
             ->whereNull('therapy_id')
             ->whereNull('agreement_id')
             ->first();
 
         if (!$regra) {
-            return ['sessoes' => $atendimentos->count(), 'valor_regra' => 'Sem Regra Cadastrada', 'valor_total' => 0];
+            return [
+                'sessoes' => $atendimentos->sum('session_number'), 
+                'valor_regra' => 'Sem Regra Cadastrada', 
+                'valor_total' => 0
+            ];
         }
 
-        $totalSessoes = $atendimentos->count();
+        $totalSessoes = $atendimentos->sum('session_number');
+        
         $valorTotal = 0;
         $descricaoRegra = '';
 
-        // 3. A Matemática
         switch ($regra->payment_type) {
             
             case 'por_sessao':
-                // Cálculo direto
                 $valorTotal = $totalSessoes * $regra->amount;
                 $descricaoRegra = 'Por Sessão (R$ ' . number_format($regra->amount, 2, ',', '.') . ')';
                 break;
 
             case 'por_dia':
-                // Extrai apenas a data (sem a hora) de cada atendimento e conta as datas únicas
                 $diasTrabalhados = $atendimentos->pluck('appointment_date')->map(function($date) {
-                    return \Carbon\Carbon::parse($date)->format('Y-m-d');
+                    return Carbon::parse($date)->format('Y-m-d');
                 })->unique()->count();
 
                 $valorTotal = $diasTrabalhados * $regra->amount;
@@ -113,27 +107,21 @@ class Fechamento extends Component
                 break;
 
             case 'por_hora':
-                // Passo A: Somar os minutos de todas as sessões
                 $totalMinutos = 0;
                 
                 foreach ($atendimentos as $atendimento) {
-                    // Carbon processa as strings do banco usando as colunas corretas
-                    $inicio = \Carbon\Carbon::parse($atendimento->check_in);
-                    $fim = \Carbon\Carbon::parse($atendimento->check_out);
+                    $inicio = Carbon::parse($atendimento->check_in);
+                    $fim = Carbon::parse($atendimento->check_out);
                     
-                    // diffInMinutes() calcula exatamente o intervalo entre eles
                     $totalMinutos += $inicio->diffInMinutes($fim);
                 }
                 
-                // Passo B: Converter para horas decimais
                 $horasDecimais = $totalMinutos / 60;
                 
-                // Passo C: Arredondar sempre para cima (Teto / Ceil)
                 $horasArredondadas = ceil($horasDecimais);
 
                 $valorTotal = $horasArredondadas * $regra->amount;
                 
-                // Extra: Para mostrar bonito no painel (ex: 12h40 vira 13h)
                 $horasFormatadas = floor($totalMinutos / 60) . 'h' . str_pad($totalMinutos % 60, 2, '0', STR_PAD_LEFT);
                 $descricaoRegra = "Por Hora ({$horasFormatadas} → Apurado: {$horasArredondadas}h)";
                 
@@ -147,7 +135,6 @@ class Fechamento extends Component
         ];
     }
 
-    // --- AÇÕES DA TELA ---
     public function abrirExtrato($profissionalId)
     {
         $profissional = Professional::findOrFail($profissionalId);
@@ -173,7 +160,6 @@ class Fechamento extends Component
         $this->extratoAtendimentos = [];
     }
 
-    // --- RENDERIZAÇÃO ---
     public function render()
     {
         $queryProfissionais = Professional::query()
@@ -188,15 +174,11 @@ class Fechamento extends Component
                 if ($this->unidade_id) $q->whereHas('patient', fn($p) => $p->where('unit_id', $this->unidade_id));
             });
 
-        // Paginação dos profissionais
         $profissionais = $queryProfissionais->orderBy('name')->paginate(10);
 
-        // Calcula os KPIs do Topo (Total Bruto e Total Sessões da Clínica)
         $somaValoresGlobais = 0;
         $somaSessoesGlobais = 0;
         
-        // Dica de performance: Para os totais globais, processamos os profissionais da página atual
-        // Se precisar do total ABSOLUTO (de todas as páginas), remova a paginação na linha abaixo.
         foreach ($profissionais->items() as $prof) {
             $resumo = $this->getResumoProducao($prof);
             $somaValoresGlobais += $resumo['valor_total'];

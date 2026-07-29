@@ -44,7 +44,36 @@ new class extends Component
                 Serviços
             </a>
 
-            <!-- ADICIONADO A ROLE PROFISSIONAL PARA ABRIR O MENU -->
+            @hasanyrole('admin|manager|administrative')
+                @php
+                    $pendentesCount = \App\Models\QualityProcess::whereHas('users', function ($query) {
+                        $query->where('users.id', auth()->id());
+                    })
+                    ->whereIn('status', ['pendente', 'em_andamento'])
+                    ->count();
+                @endphp
+                
+                <a href="{{ route('qualidade.index') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 transition-colors group">
+                    <div class="flex items-center text-gray-700 group-hover:text-gray-900">
+                        <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-medium text-sm">Qualidade</span>
+                    </div>
+
+                    @if($pendentesCount > 0)
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 rounded-md">
+                            {{ $pendentesCount }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-transparent border border-gray-300 rounded-md">
+                            0
+                        </span>
+                    @endif
+
+                </a>
+            @endhasanyrole
+
             @hasanyrole('admin|manager|administrative|profissional')
             <div x-data="{ isOpen: true }" class="pt-4 pb-1">
                 <button @click="isOpen = !isOpen" class="w-full flex items-center justify-between px-3 pb-2 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors focus:outline-none">
@@ -64,7 +93,6 @@ new class extends Component
                         </a>
                     @endhasanyrole
 
-                    <!-- VISÍVEL PARA PROFISSIONAIS -->
                     <a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="{{ request()->routeIs('terapias-realizadas.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
                         <svg class="{{ request()->routeIs('terapias-realizadas.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
@@ -72,7 +100,6 @@ new class extends Component
                         Terapias Realizadas
                     </a>
 
-                    <!-- ESCONDIDO DOS PROFISSIONAIS -->
                     @hasanyrole('admin|manager|administrative')
                         <a href="{{ route('ch-solicitada.index') }}" wire:navigate class="{{ request()->routeIs('ch-solicitada.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
                             <svg class="{{ request()->routeIs('ch-solicitada.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +292,36 @@ new class extends Component
                 Serviços
             </a>
 
-            <!-- ADICIONADO A ROLE PROFISSIONAL PARA ABRIR O MENU NO MOBILE -->
+            @hasanyrole('admin|manager|administrative')
+                @php
+                    $pendentesCount = \App\Models\QualityProcess::whereHas('users', function ($query) {
+                        $query->where('users.id', auth()->id());
+                    })
+                    ->whereIn('status', ['pendente', 'em_andamento'])
+                    ->count();
+                @endphp
+                
+                <a href="{{ route('qualidade.index') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 transition-colors group">
+                    <div class="flex items-center text-gray-700 group-hover:text-gray-900">
+                        <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-medium text-sm">Qualidade</span>
+                    </div>
+
+                    @if($pendentesCount > 0)
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 rounded-md">
+                            {{ $pendentesCount }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-transparent border border-gray-300 rounded-md">
+                            0
+                        </span>
+                    @endif
+
+                </a>
+            @endhasanyrole
+
             @hasanyrole('admin|manager|administrative|profissional')
             <div x-data="{ isOpen: true }" class="pt-4 pb-1">
                 <button @click="isOpen = !isOpen" class="w-full flex items-center justify-between px-3 pb-2 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors focus:outline-none">

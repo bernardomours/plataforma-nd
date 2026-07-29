@@ -15,11 +15,9 @@ class Index extends Component
 {
     use WithPagination;
 
-    // Controles de Modal
     public $modalAberto = false;
     public $modalExclusaoAberto = false;
 
-    // Campos do Formulário
     public $regra_id = null;
     public $professional_id = '';
     public $payment_type = 'por_sessao';
@@ -27,7 +25,6 @@ class Index extends Component
     public $therapy_id = '';
     public $agreement_id = '';
 
-    // Listas para os Selects
     public $profissionais = [];
     public $terapias = [];
     public $convenios = [];
@@ -87,9 +84,9 @@ class Index extends Component
             [
                 'professional_id' => $this->professional_id,
                 'payment_type' => $this->payment_type,
-                'amount' => str_replace(',', '.', $this->amount), // Garante formato numérico correto
-                'therapy_id' => $this->therapy_id ?: null, // Salva null se vazio
-                'agreement_id' => $this->agreement_id ?: null, // Salva null se vazio
+                'amount' => str_replace(',', '.', $this->amount),
+                'therapy_id' => $this->therapy_id ?: null,
+                'agreement_id' => $this->agreement_id ?: null,
             ]
         );
 

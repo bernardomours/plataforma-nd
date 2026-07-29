@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\RequestedService;
 use App\Models\Unit;
+use App\Models\Agreement;
 
 #[Layout('layouts.app')]
 class Index extends Component
@@ -17,6 +18,10 @@ class Index extends Component
     public $month = '';
     public $year = '';
     public $search = '';
+    
+    // Novas propriedades para o Convênio
+    public $agreement_id = '';
+    public $agreements = [];
 
     public $units = [];
     public $availableYears = [];
@@ -24,6 +29,9 @@ class Index extends Component
     public function mount()
     {
         $this->units = Unit::orderBy('name')->get();
+        
+        // Carrega os convênios para o select
+        $this->agreements = Agreement::orderBy('name')->get();
 
         for ($i = 0; $i <= 5; $i++) {
             $year = now()->subYears($i)->year;
@@ -47,6 +55,11 @@ class Index extends Component
                     $q->where('unit_id', $this->unit_id);
                 });
             })
+            ->when($this->agreement_id, function ($query) {
+                $query->whereHas('patient', function ($q) {
+                    $q->where('agreement_id', $this->agreement_id); 
+                });
+            })
             ->when($this->year, function ($query) {
                 $query->whereYear('month_year', $this->year);
             })
@@ -57,7 +70,7 @@ class Index extends Component
 
     public function clearFilters()
     {
-        $this->reset(['unit_id', 'month', 'year', 'search']);
+        $this->reset(['unit_id', 'month', 'year', 'search', 'agreement_id']);
         $this->resetPage(); 
     }
 
@@ -65,33 +78,33 @@ class Index extends Component
     public function updatedMonth() { $this->resetPage(); }
     public function updatedYear() { $this->resetPage(); }
     public function updatedSearch() { $this->resetPage(); }
+    public function updatedAgreement() { $this->resetPage(); }
 
     public function render()
-{
-    $allowedUnits = auth()->user()->getAllowedUnitIds();
-    
-    $query = $this->buildQuery();
-
-    if ($allowedUnits !== null) {
+    {
+        $allowedUnits = auth()->user()->getAllowedUnitIds();
         
-        $query->whereHas('patient', function ($q) use ($allowedUnits) {
-            $q->whereIn('unit_id', $allowedUnits);
-        });
+        $query = $this->buildQuery();
+
+        if ($allowedUnits !== null) {
+            $query->whereHas('patient', function ($q) use ($allowedUnits) {
+                $q->whereIn('unit_id', $allowedUnits);
+            });
+        }
+       
+        $totaisQuery = clone $query;
+        
+        $totalHorasSolicitadas = $totaisQuery->sum('requested_hours');
+        $totalHorasLiberadas = $totaisQuery->sum('approved_hours');
+        $totalHorasPlanejadas = $totaisQuery->sum('planned_hours');
+
+        $registros = $query->orderBy('month_year', 'desc')->paginate(15);
+
+        return view('livewire.ch-solicitada.index', [
+            'registros' => $registros,
+            'totalHorasSolicitadas' => $totalHorasSolicitadas,
+            'totalHorasLiberadas' => $totalHorasLiberadas,
+            'totalHorasPlanejadas' => $totalHorasPlanejadas,
+        ]);
     }
-   
-    $totaisQuery = clone $query;
-    
-    $totalHorasSolicitadas = $totaisQuery->sum('requested_hours');
-    $totalHorasLiberadas = $totaisQuery->sum('approved_hours');
-    $totalHorasPlanejadas = $totaisQuery->sum('planned_hours');
-
-    $registros = $query->orderBy('month_year', 'desc')->paginate(15);
-
-    return view('livewire.ch-solicitada.index', [
-        'registros' => $registros,
-        'totalHorasSolicitadas' => $totalHorasSolicitadas,
-        'totalHorasLiberadas' => $totalHorasLiberadas,
-        'totalHorasPlanejadas' => $totalHorasPlanejadas,
-    ]);
-}
 }

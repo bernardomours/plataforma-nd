@@ -96,4 +96,9 @@ class User extends Authenticatable
 
         return $this->units()->pluck('units.id')->toArray();
     }
+
+    public function qualityProcesses()
+    {
+        return $this->belongsToMany(QualityProcess::class, 'quality_process_user');
+    }
 }

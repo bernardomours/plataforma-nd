@@ -83,6 +83,16 @@
                         @endforeach
                     </select>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Convênio</label>
+                    <select wire:model.live="agreement_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">Todos</option>
+                        @foreach($agreements as $convenio)
+                            <option value="{{ $convenio->id }}">{{ $convenio->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -128,9 +138,13 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="py-8 px-4 text-center text-gray-500 flex flex-col items-center justify-center">
-                                    <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
-                                    Nenhum registro de carga horária encontrado.
+                                <td colspan="9" class="py-12">
+                                    <div class="flex flex-col items-center justify-center text-gray-500 w-full">
+                                        <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                        </svg>
+                                        <p class="text-sm">Nenhum registro de carga horária encontrado.</p>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse

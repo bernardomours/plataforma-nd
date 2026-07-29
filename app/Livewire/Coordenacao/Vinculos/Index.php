@@ -52,6 +52,7 @@ class Index extends Component
             
             // A Trait IsolatesByUnit já está a proteger o PatientService por trás dos panos!
             $query = PatientService::with(['patient', 'serviceType', 'coordinator', 'supervisor'])
+                ->whereHas('patient') // <-- A MÁGICA ENTRA AQUI! Exige que o paciente exista e não esteja no SoftDelete.
                 ->where(function ($q) {
                     $q->where('coordinator_id', $this->profissional_id)
                       ->orWhere('supervisor_id', $this->profissional_id);
@@ -59,6 +60,7 @@ class Index extends Component
 
             // Filtro de pesquisa pelo nome do paciente
             if ($this->search) {
+                // Aqui podemos manter o whereHas pois ele apenas adiciona uma condição extra ao paciente que já sabemos que existe
                 $query->whereHas('patient', function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%');
                 });

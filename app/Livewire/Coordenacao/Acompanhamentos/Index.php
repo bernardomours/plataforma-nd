@@ -9,7 +9,7 @@ use App\Models\Visit;
 use App\Models\Therapy;
 use App\Models\ServiceType;
 use App\Models\Professional;
-use App\Models\Unit; // Adicionado para puxar o select de Unidades
+use App\Models\Unit;
 use Carbon\Carbon;
 
 #[Layout('layouts.app')]
@@ -48,6 +48,17 @@ class Index extends Component
             $ano = now()->subYears($i)->year;
             $this->anosDisponiveis[$ano] = $ano;
         }
+
+        $user = auth()->user();
+
+        if (in_array($user->role, ['coordinator', 'supervisor'])) {
+            
+            $profissional = Professional::where('user_id', $user->id)->first();
+            
+            if ($profissional) {
+                $this->profissional_id = $profissional->id;
+            }
+        }
     }
 
     public function updatedSearch() { $this->resetPage(); }
@@ -65,7 +76,17 @@ class Index extends Component
 
     public function limparFiltros()
     {
-        $this->reset(['mes', 'ano', 'tipo', 'status', 'profissional_id', 'unidade_id', 'search', 'selectedVisits', 'selectAll']);
+        $this->reset(['mes', 'ano', 'tipo', 'status', 'unidade_id', 'search', 'selectedVisits', 'selectAll']);
+        
+        $user = auth()->user();
+
+        if (in_array($user->role, ['coordinator', 'supervisor'])) {
+            $profissional = Professional::where('user_id', $user->id)->first();
+            $this->profissional_id = $profissional ? $profissional->id : '';
+        } else {
+            $this->profissional_id = '';
+        }
+
         $this->resetPage();
     }
 
@@ -86,8 +107,15 @@ class Index extends Component
         $this->formPacienteNome = $visit->patient->name ?? 'Paciente não encontrado';
         $this->formProfissionalId = $visit->professional_id;
         $this->formHappenedAt = $visit->happened_at ? Carbon::parse($visit->happened_at)->format('Y-m-d') : '';
-        $this->formTipo = $visit->type;
-        $this->formStatus = $visit->status;
+        
+        $this->formTipo = $visit->type instanceof \BackedEnum 
+            ? $visit->type->value 
+            : ($visit->type instanceof \UnitEnum ? $visit->type->name : $visit->type);
+            
+        $this->formStatus = $visit->status instanceof \BackedEnum 
+            ? $visit->status->value 
+            : ($visit->status instanceof \UnitEnum ? $visit->status->name : $visit->status);
+            
         $this->formServiceTypeId = $visit->service_type_id;
         $this->formTherapyId = $visit->therapy_id;
         $this->formNotes = $visit->notes;

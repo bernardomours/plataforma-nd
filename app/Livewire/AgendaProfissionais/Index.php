@@ -16,21 +16,14 @@ class Index extends Component
 {
     public $professional_id = '';
     public $isRestricted = false; 
-
-    // ==========================================
-    // VARIÁVEIS DO MODAL DE BLOQUEIO
-    // ==========================================
     public $isBlockModalOpen = false;
     public $block_day = '';
     public $block_start_time = '';
     public $block_end_time = '';
     public $block_whole_day = false;
 
-    // ==========================================
-    // VARIÁVEIS DO AGENDAMENTO DE PACIENTE
-    // ==========================================
     public $isScheduleModalOpen = false;
-    public $editingScheduleId = null; // <-- NOVA VARIÁVEL PARA EDIÇÃO
+    public $editingScheduleId = null;
     public $patient_id = '';
     public $schedule_day = '';
     public $schedule_start_time = '';
@@ -50,9 +43,6 @@ class Index extends Component
         }
     }
 
-    // ==========================================
-    // FUNÇÕES DE BLOQUEIO
-    // ==========================================
     public function openBlockModal()
     {
         if (!$this->professional_id) {
@@ -128,9 +118,6 @@ class Index extends Component
         }
     }
 
-    // ==========================================
-    // FUNÇÕES DE AGENDAMENTO E EDIÇÃO (NOVIDADES AQUI)
-    // ==========================================
     public function openScheduleModal($dayNum = null, $time = null)
     {
         if (!$this->professional_id) {
@@ -139,7 +126,7 @@ class Index extends Component
         }
 
         $this->resetValidation();
-        $this->editingScheduleId = null; // Garante que é criação nova
+        $this->editingScheduleId = null;
         $this->patient_id = '';
         $this->schedule_therapy_id = '';
         $this->schedule_service_type_id = '';
@@ -207,7 +194,6 @@ class Index extends Component
             'schedule_service_type_id.required' => 'Selecione o tipo de atendimento.',
         ]);
 
-        // Blindagem total contra choques (ignorando o próprio ID na hora de editar)
         $conflito = Schedule::where('professional_id', $this->professional_id)
             ->where('day_of_week', $this->schedule_day)
             ->when($this->editingScheduleId, function($query) {
@@ -239,7 +225,6 @@ class Index extends Component
             'is_blocked' => false,
         ];
 
-        // Decide se é um Update ou Create
         if ($this->editingScheduleId) {
             Schedule::find($this->editingScheduleId)->update($data);
             session()->flash('message', 'Agendamento atualizado com sucesso!');
@@ -251,9 +236,6 @@ class Index extends Component
         $this->closeScheduleModal();
     }
 
-    // ==========================================
-    // RENDERIZAÇÃO DA AGENDA E DIAS
-    // ==========================================
     public function getAgendaProperty()
     {
         $vazio = [1 => [], 2 => [], 3 => [], 4 => [], 5 => []];

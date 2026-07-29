@@ -8,9 +8,8 @@ use App\Models\Professional;
 use App\Models\Therapy;
 use App\Models\ServiceType;
 use Livewire\Component;
-use Livewire\Attributes\Layout;
+use Carbon\Carbon;
 
-#[Layout('layouts.app')]
 class Agenda extends Component
 {
     public Patient $patient;
@@ -69,8 +68,8 @@ class Agenda extends Component
         
         $this->editingScheduleId = $schedule->id;
         $this->day_of_week = $schedule->day_of_week;
-        $this->start_time = \Carbon\Carbon::parse($schedule->start_time)->format('H:i');
-        $this->end_time = \Carbon\Carbon::parse($schedule->end_time)->format('H:i');
+        $this->start_time = Carbon::parse($schedule->start_time)->format('H:i');
+        $this->end_time = Carbon::parse($schedule->end_time)->format('H:i');
         $this->professional_id = $schedule->professional_id;
         $this->therapy_id = $schedule->therapy_id;
         $this->service_type_id = $schedule->service_type_id;

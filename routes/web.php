@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Livewire\Pacientes\Index as PacientesIndex;
 use App\Livewire\Pacientes\Create as PacientesCreate;
+use App\Livewire\Pacientes\Show as PacientesShow;
 use App\Livewire\Pacientes\Edit as PacientesEdit;
 use App\Livewire\Pacientes\Agenda as PacientesAgenda;
 use App\Livewire\Pacientes\CargaHoraria as PacientesCargaHoraria;
@@ -33,6 +34,9 @@ use App\Livewire\Producao\Index as ProducaoIndex;
 use App\Livewire\Producao\RegrasPagamento\Index as RegrasPagamentoIndex;
 use App\Livewire\Producao\AtendimentosRealizados\Index as AtendimentosIndex;
 use App\Livewire\AuditoriaHumana\Index as AtendimentoHumanaIndex;
+use App\Livewire\Qualidade\Index as QualidadeIndex;
+use App\Livewire\Qualidade\Create as QualidadeCreate;
+use App\Livewire\Qualidade\Edit as QualidadeEdit;
 
 Route::redirect('/', '/dashboard');
 
@@ -44,9 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // PACIENTES
     Route::get('/pacientes', PacientesIndex::class)->name('pacientes.index');
     Route::get('/pacientes/cadastrar', PacientesCreate::class)->name('pacientes.create');
-    Route::get('/pacientes/{patient}/editar', PacientesEdit::class)->name('pacientes.edit');
-    Route::get('/pacientes/{patient}/agenda', PacientesAgenda::class)->name('pacientes.agenda');
-    Route::get('/pacientes/{patient}/carga-horaria', PacientesCargaHoraria::class)->name('pacientes.carga-horaria');
+    Route::get('/pacientes/{patient}', PacientesShow::class)->name('pacientes.show');
     // COORDENACAO  
     Route::get('/acompanhamentos', AcompanhamentosIndex::class)->name('acompanhamentos.index');
     Route::get('/cronograma', CronogramaIndex::class)->name('cronograma.index');
@@ -57,6 +59,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/agenda-profissionais', AgendaProfissionaisIndex::class)->name('agenda-profissionais.index');
     // TERAPIAS REALIZADAS
     Route::get('/terapias-realizadas', TerapiasRealizadasIndex::class)->name('terapias-realizadas.index');
+    // QUALIDADE
+    Route::get('/qualidade', QualidadeIndex::class)->name('qualidade.index');
+    Route::get('/qualidade/novo', QualidadeCreate::class)->name('qualidade.create');
+    Route::get('/qualidade/editar/{id}', QualidadeEdit::class)->name('qualidade.edit');
     
     // FREQUENCIA
     Route::middleware('role:admin|manager|administrative')->group(function () {
@@ -73,6 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/relatorio-geral', RelatorioGeral::class)->middleware('role:admin|manager')->name('relatorios.geral');
 
+    // ADMINISTRAÇÃO
     Route::middleware('role:admin')->group(function () {
         Route::get('/usuarios', UsuariosIndex::class)->name('usuarios.index');
         Route::get('/usuarios/criar', UsuariosCreate::class)->name('usuarios.create');

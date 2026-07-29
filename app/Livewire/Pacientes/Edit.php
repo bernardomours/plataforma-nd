@@ -10,12 +10,14 @@ use App\Models\ServiceType;
 use App\Rules\CpfValidate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
-use Livewire\Attributes\Layout;
+use Livewire\Attributes\On; // <-- Importante adicionar isso
 
-#[Layout('layouts.app')]
 class Edit extends Component
 {
     public Patient $patient;
+
+    // Nova variável para controlar o Modal
+    public $showModal = false;
 
     public $name, $birth_date, $cpf, $agreement_number, $guardian_name, $guardian_phone;
     public $unit_id, $agreement_id;
@@ -25,21 +27,40 @@ class Edit extends Component
     public function mount(Patient $patient)
     {
         $this->patient = $patient;
+        $this->preencherFormulario();
+    }
 
-        $this->name = $patient->name;
-        $this->birth_date = $patient->birth_date ? $patient->birth_date->format('Y-m-d') : null;
-        $this->cpf = $patient->cpf;
-        $this->agreement_number = $patient->agreement_number;
-        $this->guardian_name = $patient->guardian_name;
-        $this->guardian_phone = $patient->guardian_phone;
-        $this->unit_id = $patient->unit_id;
-        $this->agreement_id = $patient->agreement_id;
+    // Isolar o preenchimento facilita se você quiser resetar o modal ao fechar
+    private function preencherFormulario()
+    {
+        $this->name = $this->patient->name;
+        $this->birth_date = $this->patient->birth_date ? $this->patient->birth_date->format('Y-m-d') : null;
+        $this->cpf = $this->patient->cpf;
+        $this->agreement_number = $this->patient->agreement_number;
+        $this->guardian_name = $this->patient->guardian_name;
+        $this->guardian_phone = $this->patient->guardian_phone;
+        $this->unit_id = $this->patient->unit_id;
+        $this->agreement_id = $this->patient->agreement_id;
 
-        $this->patientServices = $patient->patientServices->toArray();
+        $this->patientServices = $this->patient->patientServices->toArray();
 
         if (empty($this->patientServices)) {
             $this->addService();
         }
+    }
+
+    // Este evento será chamado pelo botão no cabeçalho
+    #[On('abrir-modal-editar-paciente')]
+    public function abrirModal()
+    {
+        $this->preencherFormulario(); // Garante que os dados estão frescos
+        $this->showModal = true;
+    }
+
+    public function fecharModal()
+    {
+        $this->showModal = false;
+        $this->resetValidation();
     }
 
     public function rules()
@@ -75,28 +96,41 @@ class Edit extends Component
     {
         $this->validate();
 
-        $this->patient->update([
-            'name' => $this->name,
-            'birth_date' => $this->birth_date,
-            'cpf' => $this->cpf,
-            'agreement_number' => $this->agreement_number,
-            'guardian_name' => $this->guardian_name,
-            'guardian_phone' => $this->guardian_phone,
-            'unit_id' => $this->unit_id,
-            'agreement_id' => $this->agreement_id,
-        ]);
+        try {
+            // Tentativa de atualizar o paciente
+            $this->patient->update([
+                'name' => $this->name,
+                'birth_date' => $this->birth_date,
+                'cpf' => $this->cpf,
+                'agreement_number' => $this->agreement_number,
+                'guardian_name' => $this->guardian_name,
+                'guardian_phone' => $this->guardian_phone,
+                'unit_id' => $this->unit_id,
+                'agreement_id' => $this->agreement_id,
+            ]);
 
-        $this->patient->patientServices()->delete();
-        
-        foreach ($this->patientServices as $service) {
-            $service['coordinator_id'] = empty($service['coordinator_id']) ? null : $service['coordinator_id'];
-            $service['supervisor_id'] = empty($service['supervisor_id']) ? null : $service['supervisor_id'];
+            $this->patient->patientServices()->delete();
             
-            $this->patient->patientServices()->create($service);
-        }
+            foreach ($this->patientServices as $service) {
+                $service['coordinator_id'] = empty($service['coordinator_id']) ? null : $service['coordinator_id'];
+                $service['supervisor_id'] = empty($service['supervisor_id']) ? null : $service['supervisor_id'];
+                
+                $this->patient->patientServices()->create($service);
+            }
 
-        session()->flash('message', "Paciente {$this->patient->name} atualizado com sucesso!");
-        return redirect()->route('pacientes.index');
+            // 1. Fecha o Modal apenas se deu tudo certo
+            $this->showModal = false;
+            
+            // 2. Avisa a tela principal (Show.php) que o paciente mudou
+            $this->dispatch('paciente-atualizado'); 
+            
+            // 3. Dispara a notificação de SUCESSO para o navegador
+            $this->dispatch('notify', type: 'success', message: 'Cadastro atualizado com sucesso!');
+
+        } catch (\Exception $e) {
+            // Se algo der errado no banco, NÃO fecha o modal e avisa o erro
+            $this->dispatch('notify', type: 'error', message: 'Erro ao salvar: verifique os dados ou tente novamente.');
+        }
     }
 
     public function render()

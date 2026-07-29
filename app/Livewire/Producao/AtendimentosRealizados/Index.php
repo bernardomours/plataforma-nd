@@ -18,7 +18,6 @@ class Index extends Component
 {
     use WithPagination;
 
-    // Filtros de Pesquisa
     public $search = '';
     public $patient_id = '';
     public $professional_id = '';
@@ -30,7 +29,6 @@ class Index extends Component
     public $start_date = '';
     public $end_date = '';
 
-    // Controle de Exibição das Colunas
     public $selectedColumns = [];
 
     public function mount()
@@ -38,7 +36,6 @@ class Index extends Component
         $this->resetColumns();
     }
 
-    // Inicializa a visibilidade das colunas (incluindo a nova "Duração")
     public function resetColumns()
     {
         $this->selectedColumns = [
@@ -49,7 +46,7 @@ class Index extends Component
             'tipo_atendimento' => true,
             'check_in' => true,
             'check_out' => true,
-            'duracao' => true, // Nossa coluna criada
+            'duracao' => true,
             'qtd_sessoes' => true,
             'profissional' => true,
             'registrado_em' => true,
@@ -73,10 +70,8 @@ class Index extends Component
 
     public function render()
     {
-        // Inicia a Query
         $query = Appointment::query()->with(['patient', 'professional', 'therapy', 'serviceType']);
 
-        // Aplica os filtros se eles estiverem preenchidos
         if ($this->patient_id) $query->where('patient_id', $this->patient_id);
         if ($this->professional_id) $query->where('professional_id', $this->professional_id);
         if ($this->agreement_id) $query->where('agreement_id', $this->agreement_id);
@@ -87,23 +82,19 @@ class Index extends Component
         if ($this->start_date) $query->whereDate('appointment_date', '>=', $this->start_date);
         if ($this->end_date) $query->whereDate('appointment_date', '<=', $this->end_date);
         
-        // Pesquisa por nome do paciente
         if ($this->search) {
             $query->whereHas('patient', function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%');
             });
         }
 
-        // 1. Calcula os totais ANTES de paginar (usando clone para a query não se contaminar)
         $totalConsultas = (clone $query)->count();
         $totalSessoes = (clone $query)->sum('session_number') ?? $totalConsultas;
 
-        // 2. Só DEPOIS aplica a ordenação e paginação
         $appointments = $query->orderBy('appointment_date', 'desc')
                               ->orderBy('check_in', 'desc')
                               ->paginate(15);
 
-        // Retorna a view enviando as listas para preencher os 'Selects'
         return view('livewire.producao.atendimentos-realizados.index', [
             'appointments' => $appointments,
             'totalConsultas' => $totalConsultas,

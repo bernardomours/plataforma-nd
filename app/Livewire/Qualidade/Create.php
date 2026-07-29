@@ -1,0 +1,90 @@
+<?php
+
+namespace App\Livewire\Qualidade;
+
+use Livewire\Component;
+use Livewire\Attributes\Layout;
+use App\Models\QualityProcess;
+use App\Models\User;
+
+#[Layout('layouts.app')]
+class Create extends Component
+{
+    public $sector = '';
+    public $process_name = '';
+    public $procedure_code = '';
+    public $due_date = '';
+    
+    
+    public $selectedUsers = [];
+    
+    public $checklists = [];
+
+    public function mount()
+    {
+        $this->checklists = [
+            ['description' => 'Em elaboração'],
+            ['description' => 'Elaborado'],
+            ['description' => 'Em implementação'],
+            ['description' => 'Auditado'],
+            ['description' => 'Em treinamento'],
+            ['description' => 'Concluído'],
+        ];
+    }
+
+    public function addChecklist()
+    {
+        $this->checklists[] = ['description' => ''];
+    }
+
+    public function removeChecklist($index)
+    {
+        unset($this->checklists[$index]);
+        $this->checklists = array_values($this->checklists);
+    }
+
+    public function save()
+    {
+        $this->validate([
+            'sector' => 'required|string|max:255',
+            'process_name' => 'required|string|max:255',
+            'procedure_code' => 'required|string|max:255',
+            'due_date' => 'nullable|date',
+            'selectedUsers' => 'required|array|min:1',
+            'checklists' => 'required|array|min:1',
+            'checklists.*.description' => 'required|string|max:255',
+        ]);
+
+        $process = QualityProcess::create([
+            'sector' => $this->sector,
+            'process_name' => $this->process_name,
+            'procedure_code' => $this->procedure_code,
+            'due_date' => $this->due_date,
+            'created_by' => auth()->id(),
+            'status' => 'pendente',
+            'progress' => 0,
+        ]);
+
+        $process->users()->attach($this->selectedUsers);
+
+        foreach ($this->checklists as $item) {
+            $process->checklists()->create([
+                'description' => $item['description']
+            ]);
+        }
+
+        session()->flash('message', 'Processo da Qualidade criado com sucesso!');
+        return redirect()->route('qualidade.index');
+    }
+
+    public function render()
+    {
+        $usuariosFiltrados = User::role(['admin', 'manager', 'administrative'])
+                                 ->orderBy('name')
+                                 ->get();
+
+        return view('livewire.qualidade.create', [
+            'allUsers' => $usuariosFiltrados 
+        ]);
+    }
+}
