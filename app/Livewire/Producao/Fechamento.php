@@ -53,6 +53,11 @@ class Fechamento extends Component
 
     public function getResumoProducao($prof)
     {
+        // 1. Verifica se já calculamos a produção desse profissional no ciclo atual
+        if (isset($this->cacheProducao[$prof->id])) {
+            return $this->cacheProducao[$prof->id];
+        }
+
         $query = Appointment::where('professional_id', $prof->id)
             ->whereYear('appointment_date', $this->ano)
             ->whereMonth('appointment_date', $this->mes)
@@ -69,7 +74,9 @@ class Fechamento extends Component
         $atendimentos = $query->get();
 
         if ($atendimentos->isEmpty()) {
-            return ['sessoes' => 0, 'valor_regra' => 'Sem produção', 'valor_total' => 0];
+            $resultado = ['sessoes' => 0, 'valor_regra' => 'Sem produção', 'valor_total' => 0];
+            $this->cacheProducao[$prof->id] = $resultado;
+            return $resultado;
         }
 
         $regra = ProfessionalPaymentRule::where('professional_id', $prof->id)
@@ -78,20 +85,20 @@ class Fechamento extends Component
             ->first();
 
         if (!$regra) {
-            return [
+            $resultado = [
                 'sessoes' => $atendimentos->sum('session_number'), 
                 'valor_regra' => 'Sem Regra Cadastrada', 
                 'valor_total' => 0
             ];
+            $this->cacheProducao[$prof->id] = $resultado;
+            return $resultado;
         }
 
         $totalSessoes = $atendimentos->sum('session_number');
-        
         $valorTotal = 0;
         $descricaoRegra = '';
 
         switch ($regra->payment_type) {
-            
             case 'por_sessao':
                 $valorTotal = $totalSessoes * $regra->amount;
                 $descricaoRegra = 'Por Sessão (R$ ' . number_format($regra->amount, 2, ',', '.') . ')';
@@ -117,22 +124,24 @@ class Fechamento extends Component
                 }
                 
                 $horasDecimais = $totalMinutos / 60;
-                
                 $horasArredondadas = ceil($horasDecimais);
-
                 $valorTotal = $horasArredondadas * $regra->amount;
                 
                 $horasFormatadas = floor($totalMinutos / 60) . 'h' . str_pad($totalMinutos % 60, 2, '0', STR_PAD_LEFT);
                 $descricaoRegra = "Por Hora ({$horasFormatadas} → Apurado: {$horasArredondadas}h)";
-                
                 break;
         }
 
-        return [
+        $resultado = [
             'sessoes' => $totalSessoes,
             'valor_regra' => $descricaoRegra,
             'valor_total' => $valorTotal
         ];
+
+        // 2. Salva o cálculo no cache
+        $this->cacheProducao[$prof->id] = $resultado;
+
+        return $resultado;
     }
 
     public function abrirExtrato($profissionalId)
@@ -174,16 +183,20 @@ class Fechamento extends Component
                 if ($this->unidade_id) $q->whereHas('patient', fn($p) => $p->where('unit_id', $this->unidade_id));
             });
 
-        $profissionais = $queryProfissionais->orderBy('name')->paginate(10);
-
+        // 1. Calcula o Total Global usando TODOS os registros filtrados (sem paginação)
+        $todosProfissionais = (clone $queryProfissionais)->get();
+        
         $somaValoresGlobais = 0;
         $somaSessoesGlobais = 0;
         
-        foreach ($profissionais->items() as $prof) {
-            $resumo = $this->getResumoProducao($prof);
+        foreach ($todosProfissionais as $prof) {
+            $resumo = $this->getResumoProducao($prof); // O cache entra em ação aqui
             $somaValoresGlobais += $resumo['valor_total'];
             $somaSessoesGlobais += $resumo['sessoes'];
         }
+
+        // 2. Aplica a paginação apenas para exibir os 10 itens na tabela da interface
+        $profissionais = $queryProfissionais->orderBy('name')->paginate(10);
 
         return view('livewire.producao.fechamento', [
             'profissionaisLista' => Professional::orderBy('name')->get(),
