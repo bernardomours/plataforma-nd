@@ -8,6 +8,7 @@ use Livewire\Attributes\Layout;
 use App\Models\RequestedService;
 use App\Models\Unit;
 use App\Models\Agreement;
+use App\Models\Appointment;
 
 #[Layout('layouts.app')]
 class Index extends Component
@@ -19,7 +20,6 @@ class Index extends Component
     public $year = '';
     public $search = '';
     
-    // Novas propriedades para o Convênio
     public $agreement_id = '';
     public $agreements = [];
 
@@ -30,7 +30,6 @@ class Index extends Component
     {
         $this->units = Unit::orderBy('name')->get();
         
-        // Carrega os convênios para o select
         $this->agreements = Agreement::orderBy('name')->get();
 
         for ($i = 0; $i <= 5; $i++) {
@@ -44,11 +43,24 @@ class Index extends Component
 
     private function buildQuery()
     {
-        return RequestedService::with(['patient.unit', 'therapy', 'serviceType'])
+        return RequestedService::query()
+            ->select('requested_services.*')
+            ->with(['patient.unit', 'therapy', 'serviceType'])
+            ->has('patient') 
+            
+            ->addSelect([
+                'realized_hours' => Appointment::selectRaw('COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(check_out, check_in))) / 3600, 0)')
+                    ->whereColumn('appointments.patient_id', 'requested_services.patient_id')
+                    ->whereColumn('appointments.therapy_id', 'requested_services.therapy_id')
+                    ->whereRaw('YEAR(appointments.appointment_date) = YEAR(requested_services.month_year)')
+                    ->whereRaw('MONTH(appointments.appointment_date) = MONTH(requested_services.month_year)')
+            ])
             ->when($this->search, function ($query) {
-                $query->whereHas('patient', function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%');
-                })->orWhere('requisition_number', 'like', '%' . $this->search . '%');
+                $query->where(function($q) {
+                    $q->whereHas('patient', function ($subQ) {
+                        $subQ->where('name', 'like', '%' . $this->search . '%');
+                    })->orWhere('requisition_number', 'like', '%' . $this->search . '%');
+                });
             })
             ->when($this->unit_id, function ($query) {
                 $query->whereHas('patient', function ($q) {
@@ -80,6 +92,20 @@ class Index extends Component
     public function updatedSearch() { $this->resetPage(); }
     public function updatedAgreement() { $this->resetPage(); }
 
+    public function formatTime($decimalHours)
+    {
+        $hours = floor($decimalHours);
+        
+        $minutes = round(($decimalHours - $hours) * 60);
+        
+        if ($minutes == 60) {
+            $hours++;
+            $minutes = 0;
+        }
+        
+            return sprintf('%02d:%02d', $hours, $minutes);
+    }
+
     public function render()
     {
         $allowedUnits = auth()->user()->getAllowedUnitIds();
@@ -97,6 +123,8 @@ class Index extends Component
         $totalHorasSolicitadas = $totaisQuery->sum('requested_hours');
         $totalHorasLiberadas = $totaisQuery->sum('approved_hours');
         $totalHorasPlanejadas = $totaisQuery->sum('planned_hours');
+        
+        $totalHorasRealizadas = $totaisQuery->get()->sum('realized_hours');
 
         $registros = $query->orderBy('month_year', 'desc')->paginate(15);
 
@@ -105,6 +133,7 @@ class Index extends Component
             'totalHorasSolicitadas' => $totalHorasSolicitadas,
             'totalHorasLiberadas' => $totalHorasLiberadas,
             'totalHorasPlanejadas' => $totalHorasPlanejadas,
+            'totalHorasRealizadas' => $totalHorasRealizadas,
         ]);
     }
 }

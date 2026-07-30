@@ -21,26 +21,32 @@ class CargaHoraria extends Component
     public $isModalOpen = false;
     public $editingRecordId = null;
 
+    // Campos Fixos (Cabeçalho)
     public $month_year;
     public $requisition_number;
-    public $requested_hours;
-    public $approved_hours;
-    public $planned_hours;
-    public $therapy_id;
-    public $service_type_id;
+
+    // Repeater Dinâmico
+    public $terapias = [];
 
     protected function rules()
     {
         return [
             'month_year' => 'required|date',
             'requisition_number' => 'required|string',
-            'requested_hours' => 'required|numeric|min:0',
-            'approved_hours' => 'nullable|numeric|min:0',
-            'planned_hours' => 'nullable|numeric|min:0',
-            'therapy_id' => 'required|exists:therapies,id',
-            'service_type_id' => 'required|exists:service_types,id',
+            'terapias' => 'required|array|min:1',
+            'terapias.*.therapy_id' => 'required|exists:therapies,id',
+            'terapias.*.service_type_id' => 'required|exists:service_types,id',
+            'terapias.*.requested_hours' => 'required|numeric|min:0',
+            'terapias.*.approved_hours' => 'nullable|numeric|min:0',
+            'terapias.*.planned_hours' => 'nullable|numeric|min:0',
         ];
     }
+    
+    protected $messages = [
+        'terapias.*.therapy_id.required' => 'A terapia é obrigatória.',
+        'terapias.*.service_type_id.required' => 'O tipo é obrigatório.',
+        'terapias.*.requested_hours.required' => 'A CH é obrigatória.',
+    ];
 
     public function mount(Patient $patient)
     {
@@ -62,6 +68,7 @@ class CargaHoraria extends Component
     {
         $this->resetValidation();
         $this->resetForm();
+        $this->adicionarTerapia(); // Já inicia com 1 linha vazia
         $this->isModalOpen = true;
     }
 
@@ -76,29 +83,45 @@ class CargaHoraria extends Component
         $this->editingRecordId = null;
         $this->month_year = '';
         $this->requisition_number = '';
-        $this->requested_hours = '';
-        $this->approved_hours = '';
-        $this->planned_hours = '';
-        $this->therapy_id = '';
-        $this->service_type_id = '';
+        $this->terapias = [];
+    }
+
+    public function adicionarTerapia()
+    {
+        $this->terapias[] = [
+            'therapy_id' => '',
+            'service_type_id' => '',
+            'requested_hours' => '',
+            'approved_hours' => '',
+            'planned_hours' => '',
+        ];
+    }
+
+    public function removerTerapia($index)
+    {
+        unset($this->terapias[$index]);
+        $this->terapias = array_values($this->terapias); 
     }
 
     public function editRecord($id)
     {
         $this->resetValidation(); 
+        $this->resetForm();
 
         $record = RequestedService::findOrFail($id);
 
         $this->editingRecordId = $record->id;
-        
         $this->month_year = Carbon::parse($record->month_year)->format('Y-m'); 
-        
         $this->requisition_number = $record->requisition_number;
-        $this->requested_hours = $record->requested_hours;
-        $this->approved_hours = $record->approved_hours;
-        $this->planned_hours = $record->planned_hours;
-        $this->therapy_id = $record->therapy_id;
-        $this->service_type_id = $record->service_type_id;
+        
+        // No modo de edição, carregamos apenas o registro específico no índice 0
+        $this->terapias[0] = [
+            'therapy_id' => $record->therapy_id,
+            'service_type_id' => $record->service_type_id,
+            'requested_hours' => $record->requested_hours,
+            'approved_hours' => $record->approved_hours,
+            'planned_hours' => $record->planned_hours,
+        ];
 
         $this->isModalOpen = true;
     }
@@ -109,23 +132,39 @@ class CargaHoraria extends Component
 
         $formattedDate = $this->month_year . '-01';
 
-        $data = [
-            'patient_id' => $this->patient->id,
-            'month_year' => $formattedDate,
-            'requisition_number' => $this->requisition_number,
-            'requested_hours' => $this->requested_hours,
-            'approved_hours' => $this->approved_hours ?: null,
-            'planned_hours' => $this->planned_hours ?: null,
-            'therapy_id' => $this->therapy_id,
-            'service_type_id' => $this->service_type_id,
-        ];
-
         if ($this->editingRecordId) {
-            RequestedService::find($this->editingRecordId)->update($data);
+            // Atualiza apenas o único registro no modo de edição
+            $dadosEdicao = $this->terapias[0];
+            
+            RequestedService::find($this->editingRecordId)->update([
+                'patient_id' => $this->patient->id,
+                'month_year' => $formattedDate,
+                'requisition_number' => $this->requisition_number,
+                'therapy_id' => $dadosEdicao['therapy_id'],
+                'service_type_id' => $dadosEdicao['service_type_id'],
+                'requested_hours' => $dadosEdicao['requested_hours'],
+                'approved_hours' => $dadosEdicao['approved_hours'] ?: null,
+                'planned_hours' => $dadosEdicao['planned_hours'] ?: null,
+            ]);
+            
             session()->flash('message', 'Solicitação atualizada com sucesso!');
+            
         } else {
-            RequestedService::create($data);
-            session()->flash('message', 'Solicitação criada com sucesso!');
+            // Cria múltiplos registros (Repeater)
+            foreach ($this->terapias as $terapia) {
+                RequestedService::create([
+                    'patient_id' => $this->patient->id,
+                    'month_year' => $formattedDate,
+                    'requisition_number' => $this->requisition_number,
+                    'therapy_id' => $terapia['therapy_id'],
+                    'service_type_id' => $terapia['service_type_id'],
+                    'requested_hours' => $terapia['requested_hours'],
+                    'approved_hours' => $terapia['approved_hours'] ?: null,
+                    'planned_hours' => $terapia['planned_hours'] ?: null,
+                ]);
+            }
+            
+            session()->flash('message', 'Solicitações criadas com sucesso!');
         }
     }
 
@@ -135,14 +174,8 @@ class CargaHoraria extends Component
         $this->closeModal();  
     }
 
-    public function saveAndCreateAnother()
-    {
-        $this->processSave(); 
-        
-        $this->resetForm();
-        $this->resetValidation();
-    }
-
+    // Removi o "saveAndCreateAnother" porque o array já resolve isso em uma tacada só.
+    
     public function deleteRecord($id)
     {
         RequestedService::findOrFail($id)->delete();

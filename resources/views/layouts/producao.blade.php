@@ -60,17 +60,47 @@
                 </button>
                 
                 <div class="flex-1"></div> 
+                
+                <!-- NOVO CONTAINER DO USUÁRIO COM DROPDOWN -->
                 <div class="flex items-center gap-4">
-                    <span class="text-sm font-bold text-gray-700">{{ auth()->user()->name }}</span>
-                    
-                    <form method="POST" action="{{ route('producao.sair') }}" class="m-0 p-0">
-                        @csrf
-                        <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                            Sair
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
+                        
+                        <!-- Botão de Ativação -->
+                        <button @click="open = ! open" class="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-blue-600 focus:outline-none transition-colors">
+                            <span>{{ auth()->user()->name }}</span>
+                            
+                            <!-- Ícone de Chevron (seta) -->
+                            <svg class="h-4 w-4 text-gray-500" :class="{'rotate-180': open}" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="transition: transform 0.2s;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
                         </button>
-                    </form>
+
+                        <div x-show="open"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="transform opacity-0 scale-95"
+                             x-transition:enter-end="transform opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="transform opacity-100 scale-100"
+                             x-transition:leave-end="transform opacity-0 scale-95"
+                             class="absolute right-0 z-50 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 border border-gray-200"
+                             style="display: none;">
+
+                            <a href="{{ url('/') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                                Área da Clínica
+                            </a>
+
+                            <div class="border-t border-gray-100 my-1"></div>
+
+                            <form method="POST" action="{{ route('producao.sair') }}" class="m-0 p-0">
+                                @csrf
+                                <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600 font-medium hover:bg-red-50 hover:text-red-700 transition-colors">
+                                    Sair
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
+
             </header>
 
             <main class="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">

@@ -6,7 +6,7 @@
 
     <div class="max-w-full mx-auto py-6 sm:px-6 lg:px-8">
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute right-0 top-0 w-2 h-full bg-orange-400"></div>
                 <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Solicitadas</h3>
@@ -34,6 +34,16 @@
                 <div class="flex items-center text-sm text-blue-500 font-medium gap-1">
                     <span>Total das horas planejadas</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute right-0 top-0 w-2 h-full bg-purple-500"></div>
+                <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Realizadas</h3>
+                <p class="text-3xl font-bold text-gray-900 mb-3">{{ $this->formatTime($totalHorasRealizadas) }}</p>
+                <div class="flex items-center text-sm text-purple-600 font-medium gap-1">
+                    <span>Total das horas realizadas</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
         </div>
@@ -119,6 +129,7 @@
                             <th class="py-4 px-4 text-center">Horas Solicitadas</th>
                             <th class="py-4 px-4 text-center">Horas Liberadas</th>
                             <th class="py-4 px-4 text-center">Horas Planejadas</th>
+                            <th class="py-4 px-4 text-center">Horas Realizadas</th>
                         </tr>   
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-800">
@@ -135,6 +146,7 @@
                                 <td class="py-4 px-4 text-center font-semibold">{{ $registro->requested_hours ?? 0 }}</td>
                                 <td class="py-4 px-4 text-center font-semibold">{{ $registro->approved_hours ?? 0 }}</td>
                                 <td class="py-4 px-4 text-center font-semibold">{{ $registro->planned_hours ?? 0 }}</td>
+                                <td class="py-4 px-4 text-center font-bold text-purple-600">{{ $this->formatTime($registro->realized_hours ?? 0) }}</td>
                             </tr>
                         @empty
                             <tr>

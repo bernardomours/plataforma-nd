@@ -254,6 +254,10 @@ new class extends Component
                         {{ __('Meu Perfil') }}
                     </x-dropdown-link>
 
+                    <x-dropdown-link :href="url('/producao')">
+                        {{ __('Área de Produção') }}
+                    </x-dropdown-link>
+
                     <button wire:click="logout" class="w-full text-start">
                         <x-dropdown-link>
                             {{ __('Sair') }}

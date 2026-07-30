@@ -24,12 +24,13 @@ class Create extends Component
     public function mount()
     {
         $this->checklists = [
-            ['description' => 'Não Iniciado'],
             ['description' => 'Em elaboração'],
-            ['description' => 'Em implementação'],
+            ['description' => 'Documento Aprovado'],
             ['description' => 'Treinado'],
+            ['description' => 'Em implementação'],
+            ['description' => 'Implementado'],
             ['description' => 'Auditado'],
-            ['description' => 'Concluído'],
+            ['description' => 'Processo Finalizado'],
         ];
     }
 
