@@ -121,7 +121,7 @@ class Edit extends Component
     public function render()
     {
         // Filtro de perfis idêntico ao do Create
-        $usuariosFiltrados = User::role(['admin', 'manager', 'administrative', 'coordinator'])
+        $usuariosFiltrados = User::role(['admin', 'manager', 'administrative', 'coordinator', 'profissional'])
                                  ->orderBy('name')
                                  ->get();
 
