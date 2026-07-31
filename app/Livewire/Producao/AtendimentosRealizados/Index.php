@@ -70,11 +70,15 @@ class Index extends Component
 
     public function render()
     {
-        $query = Appointment::query()->with(['patient', 'professional', 'therapy', 'serviceType']);
+        $query = Appointment::query()->with(['patient.agreement', 'professional', 'therapy', 'serviceType']);
 
         if ($this->patient_id) $query->where('patient_id', $this->patient_id);
         if ($this->professional_id) $query->where('professional_id', $this->professional_id);
-        if ($this->agreement_id) $query->where('agreement_id', $this->agreement_id);
+        if ($this->agreement_id) {
+            $query->whereHas('patient', function ($q) {
+                $q->where('agreement_id', $this->agreement_id);
+            });
+        }
         if ($this->therapy_id) $query->where('therapy_id', $this->therapy_id);
         if ($this->service_type_id) $query->where('service_type_id', $this->service_type_id);
         if ($this->unit_id) $query->where('unit_id', $this->unit_id);

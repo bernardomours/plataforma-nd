@@ -173,19 +173,44 @@
                             @php
                                 $duracao = '--';
                                 $alertaVermelho = false;
+                                $motivoAlerta = ''; 
 
-                                // Regra 1: Se não tiver check-out, acende o alerta vermelho
+                                // Regra 1: Se não tiver check-out
                                 if (!$appointment->check_out) {
                                     $alertaVermelho = true;
+                                    $motivoAlerta = 'Sem check-out registrado';
                                 }
 
                                 if ($appointment->check_in && $appointment->check_out) {
                                     $inicio = \Carbon\Carbon::parse($appointment->check_in);
                                     $fim = \Carbon\Carbon::parse($appointment->check_out);
                                     
-                                    // Regra 2: Verifica se o total de minutos é menor que 30
-                                    if ($inicio->diffInMinutes($fim) < 30) {
+                                    $minutos = $inicio->diffInMinutes($fim);
+                                    $qtdSessoes = $appointment->session_number ?? 1;
+                                    
+                                    // Pega os nomes em minúsculo para facilitar a busca, evitando erros de digitação (ex: UNIMED vs Unimed)
+                                    $nomeConvenio = mb_strtolower($appointment->patient?->agreement?->name ?? '');
+                                    $nomeTerapia = mb_strtolower($appointment->therapy?->name ?? '');
+                                    
+                                    // --- INÍCIO DAS REGRAS ESPECÍFICAS ---
+                                    $toleranciaPorSessao = 30; // Tolerância Padrão
+
+                                    if (str_contains($nomeConvenio, 'unimed')) {
+                                        // Regra UNIMED: 1 sessão = 1h (Exigimos no mínimo 50 min para cada sessão lançada)
+                                        $toleranciaPorSessao = 30; 
+                                    } 
+                                    elseif (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
+                                        // Regra HUMANA + ABA: 1 sessão = 40 min (Exigimos no mínimo 30 min, mantendo sua regra)
+                                        $toleranciaPorSessao = 30;
+                                    }
+                                    
+                                    // Multiplica a tolerância pela quantidade de sessões que o profissional lançou
+                                    $minutosMinimosEsperados = $qtdSessoes * $toleranciaPorSessao;
+                                    
+                                    // Verifica se o tempo real executado foi menor que o exigido pela regra
+                                    if ($minutos < $minutosMinimosEsperados) {
                                         $alertaVermelho = true;
+                                        $motivoAlerta = "Gap Detectado: {$qtdSessoes} sessões exigem pelo menos {$minutosMinimosEsperados} min no total, mas durou apenas {$minutos} min.";
                                     }
                                     
                                     $duracao = $inicio->diff($fim)->format('%H:%I');
