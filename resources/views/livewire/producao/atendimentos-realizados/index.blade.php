@@ -188,29 +188,35 @@
                                     $minutos = $inicio->diffInMinutes($fim);
                                     $qtdSessoes = $appointment->session_number ?? 1;
                                     
-                                    // Pega os nomes em minúsculo para facilitar a busca, evitando erros de digitação (ex: UNIMED vs Unimed)
                                     $nomeConvenio = mb_strtolower($appointment->patient?->agreement?->name ?? '');
                                     $nomeTerapia = mb_strtolower($appointment->therapy?->name ?? '');
                                     
-                                    // --- INÍCIO DAS REGRAS ESPECÍFICAS ---
-                                    $toleranciaPorSessao = 30; // Tolerância Padrão
+                                    // Define o tempo que UMA sessão deveria durar
+                                    $tempoIdealPorSessao = 60; // Padrão (Unimed e outros)
 
-                                    if (str_contains($nomeConvenio, 'unimed')) {
-                                        // Regra UNIMED: 1 sessão = 1h (Exigimos no mínimo 50 min para cada sessão lançada)
-                                        $toleranciaPorSessao = 30; 
-                                    } 
-                                    elseif (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
-                                        // Regra HUMANA + ABA: 1 sessão = 40 min (Exigimos no mínimo 30 min, mantendo sua regra)
-                                        $toleranciaPorSessao = 30;
+                                    if (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
+                                        $tempoIdealPorSessao = 40; // Exceção Humana + ABA
                                     }
                                     
-                                    // Multiplica a tolerância pela quantidade de sessões que o profissional lançou
-                                    $minutosMinimosEsperados = $qtdSessoes * $toleranciaPorSessao;
+                                    // Calcula o Tempo Total Ideal baseado na quantidade de sessões lançadas
+                                    $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
                                     
-                                    // Verifica se o tempo real executado foi menor que o exigido pela regra
+                                    // A regra de ouro: O mínimo aceitável é o tempo ideal MENOS 30 minutos de tolerância geral
+                                    $minutosMinimosEsperados = $tempoTotalIdeal - 30;
+
+                                    // Trava de segurança: Nenhuma consulta pode ser menor que 30 minutos absolutos
+                                    if ($minutosMinimosEsperados < 30) {
+                                        $minutosMinimosEsperados = 30;
+                                    }
+                                    
+                                    // Compara a realidade com a matemática
                                     if ($minutos < $minutosMinimosEsperados) {
                                         $alertaVermelho = true;
-                                        $motivoAlerta = "Gap Detectado: {$qtdSessoes} sessões exigem pelo menos {$minutosMinimosEsperados} min no total, mas durou apenas {$minutos} min.";
+                                        $horasMinimas = floor($minutosMinimosEsperados / 60);
+                                        $minutosRestantes = $minutosMinimosEsperados % 60;
+                                        $formatadoMinimo = sprintf('%02d:%02d', $horasMinimas, $minutosRestantes);
+                                        
+                                        $motivoAlerta = "Gap Detectado: O mínimo esperado era de {$formatadoMinimo} h.";
                                     }
                                     
                                     $duracao = $inicio->diff($fim)->format('%H:%I');
