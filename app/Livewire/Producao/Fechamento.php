@@ -11,6 +11,7 @@ use App\Models\Therapy;
 use App\Models\Unit;
 use Carbon\Carbon;
 use App\Models\ProfessionalPaymentRule;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 #[Layout('layouts.producao')]
 class Fechamento extends Component
@@ -22,7 +23,7 @@ class Fechamento extends Component
     public $profissional_id = '';
     public $terapia_id = '';
     public $unidade_id = '';
-
+    public $profissionalExtratoId;
     public $modalExtratoAberto = false;
     public $profissionalExtratoNome = '';
     public $extratoAtendimentos = [];
@@ -51,24 +52,33 @@ class Fechamento extends Component
         $this->resetPage();
     }
 
+    public function alternarGlosa($id)
+    {
+        $atendimento = Appointment::findOrFail($id);
+        
+        $atendimento->is_glosado = !$atendimento->is_glosado;
+        $atendimento->save();
+
+        $this->cacheProducao = [];
+
+        $this->abrirExtrato($atendimento->professional_id);
+    }
+
     public function getResumoProducao($prof)
     {
-        // 1. Verifica se já calculamos a produção desse profissional no ciclo atual
         if (isset($this->cacheProducao[$prof->id])) {
             return $this->cacheProducao[$prof->id];
         }
 
-        $query = Appointment::where('professional_id', $prof->id)
+        $query = Appointment::with(['therapy', 'serviceType', 'patient.agreement']) 
+            ->where('professional_id', $prof->id)
             ->whereYear('appointment_date', $this->ano)
             ->whereMonth('appointment_date', $this->mes)
             ->whereNotNull('check_in') 
-            ->whereNotNull('check_out');
+            ->where('is_glosado', false); 
 
         if ($this->terapia_id) {
             $query->where('therapy_id', $this->terapia_id);
-        }
-        if ($this->unidade_id) {
-            $query->where('unit_id', $this->unidade_id);
         }
 
         $atendimentos = $query->get();
@@ -79,12 +89,9 @@ class Fechamento extends Component
             return $resultado;
         }
 
-        $regra = ProfessionalPaymentRule::where('professional_id', $prof->id)
-            ->whereNull('therapy_id')
-            ->whereNull('agreement_id')
-            ->first();
+        $regras = ProfessionalPaymentRule::where('professional_id', $prof->id)->get();
 
-        if (!$regra) {
+        if ($regras->isEmpty()) {
             $resultado = [
                 'sessoes' => $atendimentos->sum('session_number'), 
                 'valor_regra' => 'Sem Regra Cadastrada', 
@@ -94,51 +101,72 @@ class Fechamento extends Component
             return $resultado;
         }
 
-        $totalSessoes = $atendimentos->sum('session_number');
+        $regrasOrdenadas = $regras->sortByDesc(function ($r) {
+            $score = 0;
+            if (!is_null($r->therapy_id)) $score++;
+            if (!is_null($r->service_type_id)) $score++;
+            if (!is_null($r->agreement_id)) $score++;
+            return $score;
+        });
+
+        $totalSessoes = 0;
         $valorTotal = 0;
-        $descricaoRegra = '';
+        $resumoTextualRegras = []; 
 
-        switch ($regra->payment_type) {
-            case 'por_sessao':
-                $valorTotal = $totalSessoes * $regra->amount;
-                $descricaoRegra = 'Por Sessão (R$ ' . number_format($regra->amount, 2, ',', '.') . ')';
-                break;
+        foreach ($atendimentos as $atendimento) {
+            $qtdSessoes = $atendimento->session_number ?? 1;
+            $totalSessoes += $qtdSessoes;
+            
+            $pacienteConvenioId = $atendimento->patient->agreement_id ?? null;
+            $regraAplicada = null;
 
-            case 'por_dia':
-                $diasTrabalhados = $atendimentos->pluck('appointment_date')->map(function($date) {
-                    return Carbon::parse($date)->format('Y-m-d');
-                })->unique()->count();
+            foreach ($regrasOrdenadas as $regra) {
+                $matchTherapy = is_null($regra->therapy_id) || $regra->therapy_id == $atendimento->therapy_id;
+                $matchAmbiente = is_null($regra->service_type_id) || $regra->service_type_id == $atendimento->service_type_id;
+                $matchConvenio = is_null($regra->agreement_id) || $regra->agreement_id == $pacienteConvenioId;
 
-                $valorTotal = $diasTrabalhados * $regra->amount;
-                $descricaoRegra = 'Por Dia (' . $diasTrabalhados . ' dias trab.)';
-                break;
-
-            case 'por_hora':
-                $totalMinutos = 0;
-                
-                foreach ($atendimentos as $atendimento) {
-                    $inicio = Carbon::parse($atendimento->check_in);
-                    $fim = Carbon::parse($atendimento->check_out);
-                    
-                    $totalMinutos += $inicio->diffInMinutes($fim);
+                if ($matchTherapy && $matchAmbiente && $matchConvenio) {
+                    $regraAplicada = $regra;
+                    break;
                 }
-                
-                $horasDecimais = $totalMinutos / 60;
-                $horasArredondadas = ceil($horasDecimais);
-                $valorTotal = $horasArredondadas * $regra->amount;
-                
-                $horasFormatadas = floor($totalMinutos / 60) . 'h' . str_pad($totalMinutos % 60, 2, '0', STR_PAD_LEFT);
-                $descricaoRegra = "Por Hora ({$horasFormatadas} → Apurado: {$horasArredondadas}h)";
-                break;
+            }
+
+            if ($regraAplicada) {
+                if ($regraAplicada->payment_type == 'por_sessao' || $regraAplicada->payment_type == 'Por Sessão') {
+                    $valorTotal += $qtdSessoes * $regraAplicada->amount;
+
+                    $nomeEtiqueta = [];
+                    if ($regraAplicada->agreement_id) {
+                        $nomeEtiqueta[] = $atendimento->patient->agreement->name ?? 'Convênio Específico';
+                    }
+                    if ($regraAplicada->therapy_id) {
+                        $nomeEtiqueta[] = $atendimento->therapy->name ?? 'Terapia Específica';
+                    }
+                    if ($regraAplicada->service_type_id) {
+                        $nomeEtiqueta[] = $atendimento->serviceType->name ?? 'Ambiente Específico';
+                    }
+                    
+                    $chaveFiltro = empty($nomeEtiqueta) ? 'Regra Geral' : implode(' + ', $nomeEtiqueta);
+                    $resumoTextualRegras[$chaveFiltro] = $regraAplicada->amount;
+                } 
+            }
         }
+
+        $textosExibicao = [];
+        foreach ($resumoTextualRegras as $nome => $valor) {
+            $textosExibicao[] = $nome . ' (R$ ' . number_format($valor, 2, ',', '.') . ')';
+        }
+        
+        $descricaoRegraFinal = empty($textosExibicao) 
+            ? 'Regras Incompatíveis' 
+            : implode(' | ', $textosExibicao);
 
         $resultado = [
             'sessoes' => $totalSessoes,
-            'valor_regra' => $descricaoRegra,
+            'valor_regra' => $descricaoRegraFinal,
             'valor_total' => $valorTotal
         ];
 
-        // 2. Salva o cálculo no cache
         $this->cacheProducao[$prof->id] = $resultado;
 
         return $resultado;
@@ -147,18 +175,21 @@ class Fechamento extends Component
     public function abrirExtrato($profissionalId)
     {
         $profissional = Professional::findOrFail($profissionalId);
+        
         $this->profissionalExtratoNome = $profissional->name;
+        
+        $this->profissionalExtratoId = $profissionalId; 
 
-        $detalhesQuery = Appointment::with(['patient', 'therapy'])
+        $detalhesQuery = Appointment::with(['patient.agreement', 'therapy']) 
             ->where('professional_id', $profissionalId)
             ->whereMonth('appointment_date', $this->mes)
             ->whereYear('appointment_date', $this->ano)
-            ->whereNotNull('check_in')
-            ->whereNotNull('check_out');
+            ->whereNotNull('check_in'); 
 
-        if ($this->terapia_id) $detalhesQuery->where('therapy_id', $this->terapia_id);
-        if ($this->unidade_id) $detalhesQuery->whereHas('patient', fn($q) => $q->where('unit_id', $this->unidade_id));
-
+        if ($this->terapia_id) {
+            $detalhesQuery->where('therapy_id', $this->terapia_id);
+        }
+        
         $this->extratoAtendimentos = $detalhesQuery->orderBy('appointment_date')->get();
         $this->modalExtratoAberto = true;
     }
@@ -169,33 +200,65 @@ class Fechamento extends Component
         $this->extratoAtendimentos = [];
     }
 
+    public function exportarExtratoPdf($profissionalId)
+    {
+        $profissional = Professional::findOrFail($profissionalId);
+
+        $atendimentos = Appointment::with(['patient', 'therapy', 'serviceType'])
+            ->where('professional_id', $profissional->id)
+            ->whereYear('appointment_date', $this->ano)
+            ->whereMonth('appointment_date', $this->mes)
+            ->whereNotNull('check_in')
+            ->orderBy('appointment_date')
+            ->get();
+
+        $resumoFinanceiro = $this->getResumoProducao($profissional);
+
+        $pdf = Pdf::loadView('pdf.extrato-profissional', [
+            'profissional' => $profissional,
+            'atendimentos' => $atendimentos,
+            'resumo' => $resumoFinanceiro,
+            'mes' => $this->mes,
+            'ano' => $this->ano
+        ]);
+
+        $nomeArquivo = 'Extrato_' . str_replace(' ', '_', $profissional->name) . '_' . $this->mes . '_' . $this->ano . '.pdf';
+        
+        return response()->streamDownload(fn () => print($pdf->output()), $nomeArquivo);
+    }
+
     public function render()
     {
         $queryProfissionais = Professional::query()
             ->when($this->profissional_id, fn($q) => $q->where('id', $this->profissional_id))
+            ->when($this->unidade_id, function ($q) {
+                $q->whereIn('id', function($subquery) {
+                    $subquery->select('professional_id')
+                             ->from('professional_unit')
+                             ->where('unit_id', $this->unidade_id);
+                });
+            })
             ->whereHas('appointments', function ($q) {
                 $q->whereMonth('appointment_date', $this->mes)
                   ->whereYear('appointment_date', $this->ano)
-                  ->whereNotNull('check_in')
-                  ->whereNotNull('check_out');
-                
-                if ($this->terapia_id) $q->where('therapy_id', $this->terapia_id);
-                if ($this->unidade_id) $q->whereHas('patient', fn($p) => $p->where('unit_id', $this->unidade_id));
+                  ->whereNotNull('check_in');
+                  
+                if ($this->terapia_id) {
+                    $q->where('therapy_id', $this->terapia_id);
+                }
             });
 
-        // 1. Calcula o Total Global usando TODOS os registros filtrados (sem paginação)
         $todosProfissionais = (clone $queryProfissionais)->get();
         
         $somaValoresGlobais = 0;
         $somaSessoesGlobais = 0;
         
         foreach ($todosProfissionais as $prof) {
-            $resumo = $this->getResumoProducao($prof); // O cache entra em ação aqui
+            $resumo = $this->getResumoProducao($prof);
             $somaValoresGlobais += $resumo['valor_total'];
             $somaSessoesGlobais += $resumo['sessoes'];
         }
 
-        // 2. Aplica a paginação apenas para exibir os 10 itens na tabela da interface
         $profissionais = $queryProfissionais->orderBy('name')->paginate(10);
 
         return view('livewire.producao.fechamento', [

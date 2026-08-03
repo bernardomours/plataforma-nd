@@ -140,7 +140,7 @@
 
                             <td class="py-3 px-4">
                                 <div class="font-bold text-gray-900">{{ $profissional->name }}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">{{ $profissional->cpf }} | {{ $profissional->phone }}</div>
+                                <div class="text-xs text-gray-400 mt-0.5">{{ $profissional->cpf }} | {{ $profissional->birth_date ? \Carbon\Carbon::parse($profissional->birth_date)->format('d/m/Y') : 'Data não informada' }}</div>
                             </td>
 
                             <td class="py-3 px-4">

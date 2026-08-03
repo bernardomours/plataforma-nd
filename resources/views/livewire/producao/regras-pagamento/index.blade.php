@@ -11,7 +11,6 @@
         </button>
     </div>
 
-    <!-- Tabela -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm border-collapse">
@@ -22,6 +21,7 @@
                         <th class="py-3 px-4">Valor (R$)</th>
                         <th class="py-3 px-4 text-center">Convênio</th>
                         <th class="py-3 px-4 text-center">Terapia</th>
+                        <th class="py-3 px-4 text-center">Ambiente</th>
                         <th class="py-3 px-4 text-right">Ações</th>
                     </tr>
                 </thead>
@@ -55,6 +55,12 @@
                                     {{ $regra->therapy->name ?? 'Todas' }}
                                 </span>
                             </td>
+
+                            <td class="py-4 px-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                                    {{ $regra->serviceType->name ?? 'Todos' }}
+                                </span>
+                            </td>
                             
                             <td class="py-4 px-4 text-right">
                                 <button wire:click="abrirModalEditar({{ $regra->id }})" class="text-blue-600 hover:text-blue-900 font-medium text-xs mr-3">Editar</button>
@@ -63,7 +69,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-8 text-center text-gray-500 text-sm">
+                            <td colspan="7" class="py-8 text-center text-gray-500 text-sm">
                                 Nenhuma regra de pagamento cadastrada.
                             </td>
                         </tr>
@@ -78,7 +84,6 @@
         @endif
     </div>
 
-    <!-- MODAL CRIAR/EDITAR -->
     @if($modalAberto)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -93,7 +98,6 @@
                             </h3>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Detalhes Principais -->
                                 <div class="col-span-2">
                                     <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-2">Detalhes da Regra</h4>
                                 </div>
@@ -130,31 +134,43 @@
                                     @error('amount') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                                 </div>
 
-                                <!-- Filtros de Exceção -->
                                 <div class="col-span-2 mt-4">
                                     <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filtros de Exceção</h4>
-                                    <p class="text-xs text-gray-400 mb-3">Deixe em branco para aplicar a todos os convênios ou terapias deste profissional.</p>
+                                    <p class="text-xs text-gray-400 mb-3">Deixe em branco para aplicar a todos os convênios, terapias ou ambientes.</p>
+                                </div>
+                                
+                                <div class="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-1">Convênio</label>
+                                        <select wire:model="agreement_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            <option value="">Aplicar a Todos</option>
+                                            @foreach($convenios as $conv)
+                                                <option value="{{ $conv->id }}">{{ $conv->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-1">Terapia</label>
+                                        <select wire:model="therapy_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            <option value="">Aplicar a Todas</option>
+                                            @foreach($terapias as $terapia)
+                                                <option value="{{ $terapia->id }}">{{ $terapia->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-1">Ambiente</label>
+                                        <select wire:model="service_type_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            <option value="">Aplicar a Todos</option>
+                                            @foreach($ambientes as $ambiente)
+                                                <option value="{{ $ambiente->id }}">{{ $ambiente->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
                                 </div>
 
-                                <div class="col-span-2 md:col-span-1">
-                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Convênio Específico</label>
-                                    <select wire:model="agreement_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                        <option value="">Aplicar a Todos</option>
-                                        @foreach($convenios as $conv)
-                                            <option value="{{ $conv->id }}">{{ $conv->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-span-2 md:col-span-1">
-                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Terapia Específica</label>
-                                    <select wire:model="therapy_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                        <option value="">Aplicar a Todas</option>
-                                        @foreach($terapias as $terapia)
-                                            <option value="{{ $terapia->id }}">{{ $terapia->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
                             </div>
                         </div>
                         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-xl border-t border-gray-100">
@@ -171,7 +187,6 @@
         </div>
     @endif
 
-    <!-- MODAL DE EXCLUSÃO -->
     @if($modalExclusaoAberto)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">

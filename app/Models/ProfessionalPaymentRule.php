@@ -16,6 +16,7 @@ class ProfessionalPaymentRule extends Model
         'agreement_id',
         'payment_type',
         'amount',
+        'service_type_id',
     ];
 
     public function professional(): BelongsTo
@@ -31,5 +32,10 @@ class ProfessionalPaymentRule extends Model
     public function agreement(): BelongsTo
     {
         return $this->belongsTo(Agreement::class);
+    }
+
+    public function serviceType()
+    {
+        return $this->belongsTo(ServiceType::class, 'service_type_id');
     }
 }

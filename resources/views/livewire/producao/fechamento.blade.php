@@ -60,7 +60,7 @@
                 <select wire:model.live="unidade_id" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
                     <option value="">Selecione uma opção</option>
                     @foreach($unidadesLista as $unidade)
-                        <option value="{{ $unidade->id }}">{{ $unidade->name ?? $unidade->city }}</option>
+                        <option value="{{ $unidade->id }}">{{ $unidade->city ?? $unidade->city }}</option>
                     @endforeach
                 </select>
             </div>
@@ -95,6 +95,7 @@
         </div>
     </div>
 
+    <!-- TABELA PRINCIPAL (Lista de Profissionais) -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm border-collapse">
@@ -156,6 +157,7 @@
         @endif
     </div>
 
+    <!-- MODAL DE EXTRATO -->
     @if($modalExtratoAberto)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -175,9 +177,20 @@
                                     Período Apurado: {{ str_pad($mes, 2, '0', STR_PAD_LEFT) }}/{{ $ano }}
                                 </p>
                             </div>
-                            <button wire:click="fecharExtrato" class="text-gray-400 hover:text-gray-600 transition-colors">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
+                            
+                            <div class="flex items-center gap-4">
+                                <button wire:click="exportarExtratoPdf({{ $profissionalExtratoId }})" 
+                                        class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-blue-300 transition ease-in-out duration-150 shadow-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Exportar PDF
+                                </button>
+                                
+                                <button wire:click="fecharExtrato" class="text-gray-400 hover:text-gray-600 transition-colors" title="Fechar">
+                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -189,13 +202,68 @@
                                     <th class="py-2 px-2">Paciente</th>
                                     <th class="py-2 px-2">Terapia</th>
                                     <th class="py-2 px-2 text-center">Sessões (Qtd)</th>
+                                    <th class="py-2 px-2 text-center">Ação</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 text-gray-800">
                                 @forelse($extratoAtendimentos as $atendimento)
-                                    <tr class="hover:bg-white transition-colors">
+                                    @php
+                                        $alertaVermelho = false;
+                                        $motivoAlerta = ''; 
+
+                                        if (!$atendimento->check_out) {
+                                            $alertaVermelho = true;
+                                            $motivoAlerta = 'Sem check-out';
+                                        }
+
+                                        if ($atendimento->check_in && $atendimento->check_out) {
+                                            $inicio = \Carbon\Carbon::parse($atendimento->check_in);
+                                            $fim = \Carbon\Carbon::parse($atendimento->check_out);
+                                            
+                                            $minutos = $inicio->diffInMinutes($fim);
+                                            $qtdSessoes = $atendimento->session_number ?? 1;
+                                            
+                                            $nomeConvenio = mb_strtolower($atendimento->patient?->agreement?->name ?? '');
+                                            $nomeTerapia = mb_strtolower($atendimento->therapy?->name ?? '');
+                                            
+                                            $tempoIdealPorSessao = 60; 
+                                            if (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
+                                                $tempoIdealPorSessao = 40; 
+                                            }
+                                            
+                                            $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
+                                            $minutosMinimosEsperados = $tempoTotalIdeal - 30;
+
+                                            if ($minutosMinimosEsperados < 30) {
+                                                $minutosMinimosEsperados = 30;
+                                            }
+                                            
+                                            if ($minutos < $minutosMinimosEsperados) {
+                                                $alertaVermelho = true;
+                                                $motivoAlerta = 'Tempo Insuficiente';
+                                            }
+                                        }
+
+                                        $classesLinha = 'transition-colors ';
+                                        if ($atendimento->is_glosado) {
+                                            $classesLinha .= 'bg-gray-100 opacity-60 text-gray-500 line-through';
+                                        } elseif ($alertaVermelho) {
+                                            $classesLinha .= 'bg-red-50 hover:bg-red-100 text-red-900';
+                                        } else {
+                                            $classesLinha .= 'hover:bg-gray-50';
+                                        }
+                                    @endphp
+
+                                    <tr class="{{ $classesLinha }}" title="{{ $motivoAlerta }}">
                                         <td class="py-3 px-2 text-xs">
                                             {{ \Carbon\Carbon::parse($atendimento->appointment_date)->format('d/m/Y') }}
+                                            
+                                            @if($alertaVermelho && !$atendimento->is_glosado)
+                                                <span class="block text-[10px] text-red-600 font-bold leading-tight mt-1">⚠️ {{ $motivoAlerta }}</span>
+                                            @endif
+                                            @if($atendimento->is_glosado)
+                                                <span class="block text-[10px] text-gray-600 font-bold leading-tight mt-1">❌ Descontado</span>
+                                            @endif
                                         </td>
                                         <td class="py-3 px-2 font-medium uppercase text-xs">
                                             {{ $atendimento->patient->name ?? '-' }}
@@ -206,10 +274,23 @@
                                         <td class="py-3 px-2 text-center font-bold">
                                             {{ $atendimento->session_number }}
                                         </td>
+                                        <td class="py-3 px-2 text-center">
+                                            @if($atendimento->is_glosado)
+                                                <button wire:click="alternarGlosa({{ $atendimento->id }})" class="text-[10px] font-bold px-2 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors">
+                                                    Desfazer
+                                                </button>
+                                            @elseif($alertaVermelho)
+                                                <button wire:click="alternarGlosa({{ $atendimento->id }})" class="text-[10px] font-bold px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 shadow-sm transition-colors">
+                                                    Descontar
+                                                </button>
+                                            @else
+                                                <span class="text-[10px] text-green-600 font-bold px-2 py-1 bg-green-50 rounded border border-green-200">OK</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="py-6 text-center text-gray-500 text-xs">
+                                        <td colspan="5" class="py-6 text-center text-gray-500 text-xs">
                                             Nenhum detalhe encontrado para este período.
                                         </td>
                                     </tr>
@@ -217,10 +298,8 @@
                             </tbody>
                         </table>
                     </div>
-
                 </div>
             </div>
         </div>
     @endif
-
 </div>

@@ -9,6 +9,7 @@ use App\Models\ProfessionalPaymentRule;
 use App\Models\Professional;
 use App\Models\Therapy;
 use App\Models\Agreement;
+use App\Models\ServiceType; // <-- Model de Ambiente importado
 
 #[Layout('layouts.producao')]
 class Index extends Component
@@ -24,10 +25,12 @@ class Index extends Component
     public $amount = '';
     public $therapy_id = '';
     public $agreement_id = '';
+    public $service_type_id = ''; // <-- Nova propriedade
 
     public $profissionais = [];
     public $terapias = [];
     public $convenios = [];
+    public $ambientes = []; // <-- Nova propriedade para a lista
 
     protected function rules()
     {
@@ -37,6 +40,8 @@ class Index extends Component
             'amount' => 'required|numeric|min:0',
             'therapy_id' => 'nullable|exists:therapies,id',
             'agreement_id' => 'nullable|exists:agreements,id',
+            // Certifique-se de que o nome da tabela no BD seja 'service_types', caso contrário, ajuste abaixo:
+            'service_type_id' => 'nullable|exists:service_types,id', 
         ];
     }
 
@@ -52,6 +57,7 @@ class Index extends Component
         $this->profissionais = Professional::orderBy('name')->get();
         $this->terapias = Therapy::orderBy('name')->get();
         $this->convenios = Agreement::orderBy('name')->get();
+        $this->ambientes = ServiceType::orderBy('name')->get(); // <-- Carregando lista do banco
     }
 
     public function abrirModalCriar()
@@ -71,6 +77,7 @@ class Index extends Component
         $this->amount = $regra->amount;
         $this->therapy_id = $regra->therapy_id;
         $this->agreement_id = $regra->agreement_id;
+        $this->service_type_id = $regra->service_type_id; // <-- Preenchendo ao editar
 
         $this->modalAberto = true;
     }
@@ -87,6 +94,7 @@ class Index extends Component
                 'amount' => str_replace(',', '.', $this->amount),
                 'therapy_id' => $this->therapy_id ?: null,
                 'agreement_id' => $this->agreement_id ?: null,
+                'service_type_id' => $this->service_type_id ?: null, // <-- Salvando no banco
             ]
         );
 
@@ -114,14 +122,14 @@ class Index extends Component
 
     public function resetForm()
     {
-        $this->reset(['regra_id', 'professional_id', 'therapy_id', 'agreement_id', 'amount']);
+        $this->reset(['regra_id', 'professional_id', 'therapy_id', 'agreement_id', 'service_type_id', 'amount']);
         $this->payment_type = 'por_sessao';
         $this->resetValidation();
     }
 
     public function render()
     {
-        $regras = ProfessionalPaymentRule::with(['professional', 'therapy', 'agreement'])
+        $regras = ProfessionalPaymentRule::with(['professional', 'therapy', 'agreement', 'serviceType'])
             ->orderBy('id', 'desc')
             ->paginate(10);
 
