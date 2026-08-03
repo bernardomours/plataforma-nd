@@ -39,12 +39,46 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Profissional</label>
-                <select wire:model.live="profissional_id" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
-                    <option value="">Selecione uma opção</option>
-                    @foreach($profissionaisLista as $prof)
-                        <option value="{{ $prof->id }}">{{ $prof->name }}</option>
-                    @endforeach
-                </select>
+                <div x-data="{
+                        open: false,
+                        search: '',
+                        options: [
+                            { value: '', label: 'Selecione uma opção' },
+                            @foreach($profissionaisLista as $prof)
+                                { value: '{{ $prof->id }}', label: '{!! addslashes($prof->name) !!}' },
+                            @endforeach
+                        ],
+                        get filteredOptions() {
+                            if (this.search === '') return this.options;
+                            return this.options.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase()));
+                        },
+                        get selectedLabel() {
+                            let selectedOpt = this.options.find(i => i.value == $wire.profissional_id);
+                            return selectedOpt ? selectedOpt.label : 'Selecione uma opção';
+                        }
+                    }"
+                    class="relative w-full"
+                >
+                    <div @click="open = !open" class="block w-full border border-gray-300 rounded-md shadow-sm sm:text-sm px-3 py-2 bg-white cursor-pointer flex justify-between items-center focus:ring-blue-500 focus:border-blue-500 min-h-[38px]">
+                        <span x-text="selectedLabel" class="text-gray-700 truncate"></span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <div x-show="open" @click.away="open = false" style="display: none;" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+                        <div class="p-2 border-b border-gray-100 bg-gray-50">
+                            <input type="text" x-model="search" placeholder="Pesquisar..." class="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1 shadow-sm">
+                        </div>
+                        <ul class="max-h-48 overflow-y-auto text-sm text-gray-700 bg-white">
+                            <template x-for="option in filteredOptions" :key="option.value">
+                                <li @click="$wire.set('profissional_id', option.value); open = false; search = ''"
+                                    class="px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors"
+                                    :class="{ 'bg-blue-50 font-bold text-blue-700': $wire.profissional_id == option.value }">
+                                    <span x-text="option.label"></span>
+                                </li>
+                            </template>
+                            <li x-show="filteredOptions.length === 0" class="px-3 py-2 text-gray-500 text-center">Nenhum encontrado</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Terapia</label>
@@ -157,7 +191,6 @@
         @endif
     </div>
 
-    <!-- MODAL DE EXTRATO -->
     @if($modalExtratoAberto)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">

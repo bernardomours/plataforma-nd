@@ -87,6 +87,7 @@
                             <th class="py-3 px-4">Tipo</th>
                             <th class="py-3 px-4">Ambiente</th>
                             <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-4">Disponível Desde</th>
                             <th class="py-3 px-4"></th>
                         </tr>
                     </thead>
@@ -114,12 +115,14 @@
                                     @else
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">Concluída</span>
                                     @endif
-</td>
+                                </td>
+                                <td class="py-3 px-4 text-xs uppercase">{{ $visit->created_at ? \Carbon\Carbon::parse($visit->created_at)->format('d/m/Y') : 'Data não informada' }}</td>
                                 <td class="py-3 px-4 text-right">
                                     <button wire:click="editVisit({{ $visit->id }})" class="text-blue-600 hover:text-blue-900 bg-blue-50 p-1.5 rounded-md hover:bg-blue-100 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     </button>
                                 </td>
+
                             </tr>
                         @empty
                             <tr>

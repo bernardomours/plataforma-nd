@@ -82,7 +82,16 @@ class Index extends Component
         if ($this->therapy_id) $query->where('therapy_id', $this->therapy_id);
         if ($this->service_type_id) $query->where('service_type_id', $this->service_type_id);
         if ($this->unit_id) $query->where('unit_id', $this->unit_id);
-        if ($this->guide) $query->where('guide', 'like', '%' . $this->guide . '%');
+        
+        // NOVA LÓGICA DO FILTRO DE GUIA
+        if ($this->guide === 'vazio') {
+            $query->where(function ($q) {
+                $q->whereNull('guide')->orWhere('guide', '');
+            });
+        } elseif ($this->guide) {
+            $query->where('guide', $this->guide);
+        }
+
         if ($this->start_date) $query->whereDate('appointment_date', '>=', $this->start_date);
         if ($this->end_date) $query->whereDate('appointment_date', '<=', $this->end_date);
         
@@ -99,6 +108,13 @@ class Index extends Component
                               ->orderBy('check_in', 'desc')
                               ->paginate(15);
 
+        // BUSCA AS GUIAS ÚNICAS EXISTENTES NO BANCO PARA O DROPDOWN
+        $availableGuides = Appointment::whereNotNull('guide')
+                                      ->where('guide', '!=', '')
+                                      ->distinct()
+                                      ->orderBy('guide')
+                                      ->pluck('guide');
+
         return view('livewire.producao.atendimentos-realizados.index', [
             'appointments' => $appointments,
             'totalConsultas' => $totalConsultas,
@@ -109,6 +125,7 @@ class Index extends Component
             'therapies' => Therapy::orderBy('name')->get(),
             'serviceTypes' => ServiceType::orderBy('name')->get(),
             'units' => Unit::orderBy('name')->get(),
+            'availableGuides' => $availableGuides,
         ]);
     }
 }
