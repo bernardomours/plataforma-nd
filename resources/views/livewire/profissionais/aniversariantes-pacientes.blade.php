@@ -6,7 +6,7 @@
                 <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"></path></svg>
             </div>
             <h4 class="text-gray-700 font-medium">Nenhum aniversariante</h4>
-            <p class="text-xs text-gray-500 mt-1">Nenhum paciente seu faz anos em {{ ucfirst($mesAtual) }}.</p>
+            <p class="text-xs text-gray-500 mt-1">Nenhum paciente seu faz aniversário em {{ ucfirst($mesAtual) }}.</p>
         </div>
     @else
         <div class="space-y-3 flex-1 overflow-y-auto pr-2">

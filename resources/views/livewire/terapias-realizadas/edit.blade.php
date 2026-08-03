@@ -1,6 +1,6 @@
 <div>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-4 mt-4">
             <a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="p-2 -ml-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>

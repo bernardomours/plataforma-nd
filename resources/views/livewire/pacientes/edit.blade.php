@@ -1,5 +1,4 @@
 <div>
-    <!-- O x-cloak e style="display:none" garantem que o form inicie invisível -->
     <div x-data="{ show: @entangle('showModal') }" 
          x-show="show" 
          x-cloak
@@ -9,7 +8,6 @@
          role="dialog" 
          aria-modal="true">
         
-        <!-- Fundo escuro (Overlay) -->
         <div x-show="show" 
              x-transition:enter="ease-out duration-300" 
              x-transition:enter-start="opacity-0" 
@@ -19,11 +17,9 @@
              x-transition:leave-end="opacity-0" 
              class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity backdrop-blur-sm"></div>
 
-        <!-- Centralizador do Modal -->
         <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
             <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
                 
-                <!-- Caixa Branca do Formulário -->
                 <div x-show="show" 
                      x-transition:enter="ease-out duration-300" 
                      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
@@ -34,7 +30,6 @@
                      @click.outside="$wire.fecharModal()"
                      class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl border border-gray-200">
                     
-                    <!-- Cabeçalho do Modal -->
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                         <h3 class="text-lg font-bold text-gray-900" id="modal-title">Editar Cadastro do Paciente</h3>
                         <button type="button" wire:click="fecharModal" class="text-gray-400 hover:text-gray-500 focus:outline-none transition-colors">
@@ -44,10 +39,8 @@
                         </button>
                     </div>
 
-                    <!-- Seu Formulário Original Aqui Dentro -->
                     <form wire:submit.prevent="update">
                         
-                        <!-- Área rolável do formulário -->
                         <div class="px-6 py-6 space-y-6 max-h-[65vh] overflow-y-auto">
                             
                             @if (session()->has('message'))
@@ -169,9 +162,8 @@
                                     Adicionar Nova Supervisão/Coordenação
                                 </button>
                             </div>
-                        </div> <!-- Fim da área rolável -->
+                        </div>
 
-                        <!-- Rodapé do Modal (Fixo embaixo) -->
                         <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 rounded-b-xl">
                             <button type="button" wire:click="fecharModal" class="px-5 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">
                                 Cancelar

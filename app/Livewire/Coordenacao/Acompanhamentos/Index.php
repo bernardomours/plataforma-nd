@@ -49,6 +49,11 @@ class Index extends Component
             $this->anosDisponiveis[$ano] = $ano;
         }
 
+        if (request()->has('edit')) {
+            $visitId = request()->query('edit');
+            $this->editVisit($visitId); 
+        }
+
         $user = auth()->user();
 
         if (in_array($user->role, ['coordinator', 'supervisor'])) {
@@ -132,7 +137,7 @@ class Index extends Component
     public function salvarVisit()
     {
         $rules = [
-            'formProfissionalId' => 'nullable|exists:professionals,id', // CORRIGIDO PARA professionals
+            'formProfissionalId' => 'nullable|exists:professionals,id',
             'formTipo' => 'required',
             'formStatus' => 'required',
             'formServiceTypeId' => 'nullable|exists:service_types,id',
@@ -166,15 +171,12 @@ class Index extends Component
 
     private function getVisitsQuery()
     {
-        // 1. Pega as unidades permitidas para o usuário atual
         $allowedUnits = auth()->user()->getAllowedUnitIds();
 
         return Visit::query()
             ->with(['patient', 'professional', 'serviceType', 'therapy'])
             
-            // 2. BLINDAGEM DE UNIDADE: Entramos no escopo do paciente
             ->whereHas('patient', function ($q) use ($allowedUnits) {
-                // Aplica a restrição do perfil
                 if ($allowedUnits !== null) {
                     if (empty($allowedUnits)) {
                         $q->whereRaw('1 = 0');
@@ -182,22 +184,19 @@ class Index extends Component
                         $q->whereIn('unit_id', $allowedUnits);
                     }
                 }
-                // Aplica o filtro do dropdown selecionado na tela
                 if ($this->unidade_id) {
                     $q->where('unit_id', $this->unidade_id);
                 }
-                // Aplica a pesquisa por nome
                 if ($this->search) {
                     $q->where('name', 'like', '%' . $this->search . '%');
                 }
             })
             
-            // Filtros normais da tela
             ->when($this->status, fn($q) => $q->where('status', $this->status))
             ->when($this->tipo, fn($q) => $q->where('type', $this->tipo))
             ->when($this->profissional_id, fn($q) => $q->where('professional_id', $this->profissional_id))
-            ->when($this->mes, fn($q) => $q->whereMonth('happened_at', $this->mes)) // Corrigido para happened_at
-            ->when($this->ano, fn($q) => $q->whereYear('happened_at', $this->ano))  // Corrigido para happened_at
+            ->when($this->mes, fn($q) => $q->whereMonth('happened_at', $this->mes))
+            ->when($this->ano, fn($q) => $q->whereYear('happened_at', $this->ano))
             ->latest('created_at');
     }
 
@@ -205,7 +204,6 @@ class Index extends Component
     {
         $allowedUnits = auth()->user()->getAllowedUnitIds();
 
-        // 3. BLINDAGEM DOS DROPDOWNS
         $unidadesQuery = Unit::query();
         $profissionaisQuery = Professional::whereIn('role', ['coordinator', 'supervisor']);
 
@@ -216,7 +214,6 @@ class Index extends Component
             } else {
                 $unidadesQuery->whereIn('id', $allowedUnits);
                 
-                // Profissionais precisam estar vinculados a pelo menos uma unidade que o usuário tem acesso
                 $profissionaisQuery->whereHas('units', function($q) use ($allowedUnits) {
                     $q->whereIn('unit_id', $allowedUnits);
                 });
@@ -225,8 +222,8 @@ class Index extends Component
 
         return view('livewire.coordenacao.acompanhamentos.index', [
             'visits' => $this->getVisitsQuery()->paginate(15),
-            'profissionais' => $profissionaisQuery->get(), // Variável segura
-            'unidades' => $unidadesQuery->get(),           // Variável segura adicionada
+            'profissionais' => $profissionaisQuery->get(),
+            'unidades' => $unidadesQuery->get(),           
             'terapias' => Therapy::all(),
             'ambientes' => ServiceType::all(),
         ]);
