@@ -1,5 +1,9 @@
 <div>
     @if($visitasAtrasadas->count() > 0)
+        <div class="mb-3">
+            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Gestão e Alertas</h2>
+        </div>
+
         <div class="bg-white shadow-sm sm:rounded-xl border border-red-200 overflow-hidden mb-6">
             
             <!-- Cabeçalho do Alerta -->

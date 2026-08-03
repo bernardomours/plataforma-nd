@@ -18,10 +18,6 @@
             <!-- ========================================== -->
             @hasanyrole('admin|manager|administrative|coordinator|supervisor')
                 <div>
-                    <div class="mb-3">
-                        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Gestão e Alertas</h2>
-                    </div>
-                    
                     <livewire:dashboard.alertas-pendentes />
                 </div>
             @endhasanyrole
