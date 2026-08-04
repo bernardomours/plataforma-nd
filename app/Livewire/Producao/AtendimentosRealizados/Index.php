@@ -5,6 +5,8 @@ namespace App\Livewire\Producao\AtendimentosRealizados;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Computed;
+use Illuminate\Support\Facades\Cache;
 use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\Professional;
@@ -68,6 +70,42 @@ class Index extends Component
         $this->resetPage();
     }
 
+    #[Computed]
+    public function patients()
+    {
+        return Patient::select('id', 'name')->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function professionals()
+    {
+        return Professional::select('id', 'name')->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function agreements() 
+    { 
+        return Agreement::select('id', 'name')->orderBy('name')->get(); 
+    }
+
+    #[Computed]
+    public function therapies() 
+    { 
+        return Therapy::select('id', 'name')->orderBy('name')->get(); 
+    }
+
+    #[Computed]
+    public function serviceTypes() 
+    { 
+        return ServiceType::select('id', 'name')->orderBy('name')->get(); 
+    }
+
+    #[Computed]
+    public function units() 
+    { 
+        return Unit::select('id', 'name', 'city')->orderBy('name')->get(); 
+    }
+
     public function render()
     {
         $query = Appointment::query()->with(['patient.agreement', 'professional', 'therapy', 'serviceType']);
@@ -83,13 +121,12 @@ class Index extends Component
         if ($this->service_type_id) $query->where('service_type_id', $this->service_type_id);
         if ($this->unit_id) $query->where('unit_id', $this->unit_id);
         
-        // NOVA LÓGICA DO FILTRO DE GUIA
         if ($this->guide === 'vazio') {
             $query->where(function ($q) {
                 $q->whereNull('guide')->orWhere('guide', '');
             });
-        } elseif ($this->guide) {
-            $query->where('guide', $this->guide);
+        } elseif (!empty($this->guide)) {
+            $query->where('guide', 'like', '%' . $this->guide . '%');
         }
 
         if ($this->start_date) $query->whereDate('appointment_date', '>=', $this->start_date);
@@ -108,24 +145,10 @@ class Index extends Component
                               ->orderBy('check_in', 'desc')
                               ->paginate(15);
 
-        // BUSCA AS GUIAS ÚNICAS EXISTENTES NO BANCO PARA O DROPDOWN
-        $availableGuides = Appointment::whereNotNull('guide')
-                                      ->where('guide', '!=', '')
-                                      ->distinct()
-                                      ->orderBy('guide')
-                                      ->pluck('guide');
-
         return view('livewire.producao.atendimentos-realizados.index', [
             'appointments' => $appointments,
             'totalConsultas' => $totalConsultas,
             'totalSessoes' => $totalSessoes,
-            'patients' => Patient::orderBy('name')->get(),
-            'professionals' => Professional::orderBy('name')->get(),
-            'agreements' => Agreement::orderBy('name')->get(),
-            'therapies' => Therapy::orderBy('name')->get(),
-            'serviceTypes' => ServiceType::orderBy('name')->get(),
-            'units' => Unit::orderBy('name')->get(),
-            'availableGuides' => $availableGuides,
         ]);
     }
 }

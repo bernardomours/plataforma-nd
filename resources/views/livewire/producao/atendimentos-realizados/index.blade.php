@@ -42,12 +42,14 @@
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Paciente</label>
                     
-                    <div x-data="{
+                    <!-- ADICIONADO wire:ignore AQUI -->
+                    <div wire:ignore x-data="{
                             open: false,
                             search: '',
                             options: [
                                 { value: '', label: 'Todos' },
-                                @foreach($patients as $patient)
+                                <!-- USANDO $this->patients -->
+                                @foreach($this->patients as $patient)
                                     { value: '{{ $patient->id }}', label: '{!! addslashes($patient->name) !!}' },
                                 @endforeach
                             ],
@@ -56,7 +58,6 @@
                                 return this.options.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase()));
                             },
                             get selectedLabel() {
-                                // Usamos == em vez de === porque o Livewire pode tratar o ID como string
                                 let selectedOpt = this.options.find(i => i.value == $wire.patient_id);
                                 return selectedOpt ? selectedOpt.label : 'Todos';
                             }
@@ -75,7 +76,8 @@
                             
                             <ul class="max-h-48 overflow-y-auto text-sm text-gray-700 bg-white">
                                 <template x-for="option in filteredOptions" :key="option.value">
-                                    <li @click="$wire.set('patient_id', option.value); open = false; search = ''"
+                                    <!-- ALTERADO DE $wire.set() PARA ATRIBUIÇÃO DIRETA PARA NÃO DISPARAR QUERY ANTES DA HORA -->
+                                    <li @click="$wire.patient_id = option.value; open = false; search = ''"
                                         class="px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors"
                                         :class="{ 'bg-blue-50 font-bold text-blue-700': $wire.patient_id == option.value }">
                                         <span x-text="option.label"></span>
@@ -91,12 +93,14 @@
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Profissional</label>
                     
-                    <div x-data="{
+                    <!-- ADICIONADO wire:ignore AQUI -->
+                    <div wire:ignore x-data="{
                             open: false,
                             search: '',
                             options: [
                                 { value: '', label: 'Todos' },
-                                @foreach($professionals as $professional)
+                                <!-- USANDO $this->professionals -->
+                                @foreach($this->professionals as $professional)
                                     { value: '{{ $professional->id }}', label: '{!! addslashes($professional->name) !!}' },
                                 @endforeach
                             ],
@@ -123,7 +127,8 @@
                             
                             <ul class="max-h-48 overflow-y-auto text-sm text-gray-700 bg-white">
                                 <template x-for="option in filteredOptions" :key="option.value">
-                                    <li @click="$wire.set('professional_id', option.value); open = false; search = ''"
+                                    <!-- ALTERADO DE $wire.set() PARA ATRIBUIÇÃO DIRETA -->
+                                    <li @click="$wire.professional_id = option.value; open = false; search = ''"
                                         class="px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors"
                                         :class="{ 'bg-blue-50 font-bold text-blue-700': $wire.professional_id == option.value }">
                                         <span x-text="option.label"></span>
@@ -140,7 +145,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Convênio</label>
                     <select wire:model="agreement_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         <option value="">Todos</option>
-                        @foreach($agreements as $agreement)
+                        @foreach($this->agreements as $agreement)
                             <option value="{{ $agreement->id }}">{{ $agreement->name }}</option>
                         @endforeach
                     </select>
@@ -149,7 +154,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Terapia</label>
                     <select wire:model="therapy_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         <option value="">Todos</option>
-                        @foreach($therapies as $therapy)
+                        @foreach($this->therapies as $therapy)
                             <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
                         @endforeach
                     </select>
@@ -158,7 +163,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Tipo de Atendimento</label>
                     <select wire:model="service_type_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         <option value="">Todos</option>
-                        @foreach($serviceTypes as $serviceType)
+                        @foreach($this->serviceTypes as $serviceType)
                             <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
                         @endforeach
                     </select>
@@ -170,60 +175,15 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Unidade</label>
                     <select wire:model="unit_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                         <option value="">Todos</option>
-                        @foreach($units as $unit)
+                        @foreach($this->units as $unit)
                             <option value="{{ $unit->id }}">{{ $unit->city ?? $unit->name }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div>
+                    <!-- OTIMIZADO: Transformado de Dropdown gigante para Input Simples -->
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Número da Guia</label>
-                    
-                    <div x-data="{
-                            open: false,
-                            search: '',
-                            options: [
-                                { value: '', label: 'Todas' },
-                                { value: 'vazio', label: 'Sem Guia (Vazias)' },
-                                @foreach($availableGuides as $g)
-                                    { value: '{{ $g }}', label: '{{ $g }}' },
-                                @endforeach
-                            ],
-                            get filteredOptions() {
-                                if (this.search === '') return this.options;
-                                return this.options.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase()));
-                            },
-                            get selectedLabel() {
-                                let selectedOpt = this.options.find(i => i.value === $wire.guide);
-                                return selectedOpt ? selectedOpt.label : 'Todas';
-                            }
-                        }"
-                        class="relative w-full"
-                    >
-                        <div @click="open = !open" class="block w-full border border-gray-300 rounded-md shadow-sm sm:text-sm px-3 py-2 bg-white cursor-pointer flex justify-between items-center focus:ring-blue-500 focus:border-blue-500 min-h-[38px]">
-                            <span x-text="selectedLabel" class="text-gray-700 truncate"></span>
-                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
-
-                        <div x-show="open" @click.away="open = false" style="display: none;" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
-                            <div class="p-2 border-b border-gray-100 bg-gray-50">
-                                <input type="text" x-model="search" placeholder="Pesquisar guia..." class="w-full border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 px-2 py-1 shadow-sm">
-                            </div>
-                            
-                            <ul class="max-h-48 overflow-y-auto text-sm text-gray-700 bg-white">
-                                <template x-for="option in filteredOptions" :key="option.value">
-                                    <li @click="$wire.set('guide', option.value); open = false; search = ''"
-                                        class="px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors"
-                                        :class="{ 'bg-blue-50 font-bold text-blue-700': $wire.guide === option.value }">
-                                        <span x-text="option.label"></span>
-                                    </li>
-                                </template>
-                                
-                                <li x-show="filteredOptions.length === 0" class="px-3 py-2 text-gray-500 text-center">
-                                    Nenhuma guia encontrada
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                    <input type="text" wire:model="guide" placeholder="Digite a guia ou 'vazio'" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Data Início</label>
@@ -235,6 +195,7 @@
                 </div>
             </div>
 
+            <!-- BOTÃO APLICAR (Agora ele é o mestre da tela) -->
             <button type="button" wire:click="applyFilters" class="px-4 py-2 bg-blue-400 text-white text-sm font-semibold rounded-md hover:bg-blue-500 transition-colors">
                 Aplicar filtros
             </button>
@@ -265,7 +226,6 @@
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.tipo_atendimento" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Tipo de Atendimento</label>
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.check_in" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Check-in</label>
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.check_out" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Check-out</label>
-                            <!-- NOVA COLUNA NO MENU -->
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.duracao" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Duração</label>
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.qtd_sessoes" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Qtd de Sessões</label>
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" wire:model.live="selectedColumns.profissional" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"> Profissional</label>
@@ -300,7 +260,6 @@
                                 $alertaVermelho = false;
                                 $motivoAlerta = ''; 
 
-                                // Regra 1: Se não tiver check-out
                                 if (!$appointment->check_out) {
                                     $alertaVermelho = true;
                                     $motivoAlerta = 'Sem check-out registrado';
@@ -316,25 +275,19 @@
                                     $nomeConvenio = mb_strtolower($appointment->patient?->agreement?->name ?? '');
                                     $nomeTerapia = mb_strtolower($appointment->therapy?->name ?? '');
                                     
-                                    // Define o tempo que UMA sessão deveria durar
-                                    $tempoIdealPorSessao = 60; // Padrão (Unimed e outros)
+                                    $tempoIdealPorSessao = 60; 
 
                                     if (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
-                                        $tempoIdealPorSessao = 40; // Exceção Humana + ABA
+                                        $tempoIdealPorSessao = 40; 
                                     }
                                     
-                                    // Calcula o Tempo Total Ideal baseado na quantidade de sessões lançadas
                                     $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
-                                    
-                                    // A regra de ouro: O mínimo aceitável é o tempo ideal MENOS 30 minutos de tolerância geral
                                     $minutosMinimosEsperados = $tempoTotalIdeal - 30;
 
-                                    // Trava de segurança: Nenhuma consulta pode ser menor que 30 minutos absolutos
                                     if ($minutosMinimosEsperados < 30) {
                                         $minutosMinimosEsperados = 30;
                                     }
                                     
-                                    // Compara a realidade com a matemática
                                     if ($minutos < $minutosMinimosEsperados) {
                                         $alertaVermelho = true;
                                         $horasMinimas = floor($minutosMinimosEsperados / 60);
@@ -357,7 +310,6 @@
                                 @if($selectedColumns['check_in']) <td class="py-4 px-4">{{ $appointment->check_in ? \Carbon\Carbon::parse($appointment->check_in)->format('H:i:s') : '-' }}</td> @endif
                                 @if($selectedColumns['check_out']) <td class="py-4 px-4">{{ $appointment->check_out ? \Carbon\Carbon::parse($appointment->check_out)->format('H:i:s') : '-' }}</td> @endif
                                 
-                                <!-- EXIBIÇÃO DA NOVA COLUNA (Fica vermelha se houver alerta) -->
                                 @if($selectedColumns['duracao'] ?? true) 
                                     <td class="py-4 px-4 text-center font-bold {{ $alertaVermelho ? 'text-red-700 bg-red-200/50' : 'text-blue-700 bg-blue-50/30' }}">
                                         {{ $duracao }}
@@ -369,7 +321,6 @@
                             </tr>
                         @empty
                             <tr>
-                                <!-- Ajustado o colspan de 11 para 12 por conta da nova coluna -->
                                 <td colspan="12" class="py-6 px-4 text-center text-gray-500">Nenhuma terapia encontrada com os filtros atuais.</td>
                             </tr>
                         @endforelse
