@@ -279,16 +279,23 @@
                                     $tempoIdealPorSessao = 40; 
                                     $tolerancia = 10;
 
-                                    // 2. EXCEÇÃO: Unimed + ABA = 60 minutos por sessão com 20 min de tolerância total
+                                    // 2. EXCEÇÃO: Unimed + ABA = 60 minutos por sessão
                                     if (str_contains($nomeConvenio, 'unimed') && str_contains($nomeTerapia, 'aba')) {
                                         $tempoIdealPorSessao = 60; 
-                                        $tolerancia = 20;
+                                        
+                                        // 3. VALIDAÇÃO DE SESSÕES UNIMED+ABA:
+                                        // 1 sessão = 10 min / 2 ou mais sessões = 20 min
+                                        if ($qtdSessoes >= 2) {
+                                            $tolerancia = 20;
+                                        } else {
+                                            $tolerancia = 10;
+                                        }
                                     }
                                     
-                                    // 3. Calcula o tempo total multiplicando pelo número de sessões
+                                    // 4. Calcula o tempo total multiplicando pelo número de sessões
                                     $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
                                     
-                                    // 4. TOLERÂNCIA: Abate a tolerância correta do tempo total esperado
+                                    // 5. TOLERÂNCIA: Abate a tolerância correta do tempo total esperado
                                     $minutosMinimosEsperados = $tempoTotalIdeal - $tolerancia;
 
                                     // Verifica se o tempo realizado foi menor que o mínimo esperado
