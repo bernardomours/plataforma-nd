@@ -13,6 +13,7 @@ class RegistroModal extends Component
 {
     public $isModalOpen = false;
     public ?Patient $patient = null;
+    public $isHumana = false; // Flag para controlar a tela
 
     // Campos Fixos (Cabeçalho)
     public $month_year = '';
@@ -21,11 +22,11 @@ class RegistroModal extends Component
     // Repeater Dinâmico
     public $terapias = [];
 
+    // Transformado em método para a regra ser dinâmica
     protected function rules()
     {
-        return [
+        $rules = [
             'month_year' => 'required|date_format:Y-m',
-            'requisition_number' => 'required|string',
             'terapias' => 'required|array|min:1',
             'terapias.*.therapy_id' => 'required|exists:therapies,id',
             'terapias.*.service_type_id' => 'required|exists:service_types,id',
@@ -33,23 +34,38 @@ class RegistroModal extends Component
             'terapias.*.approved_hours' => 'nullable|numeric|min:0',
             'terapias.*.planned_hours' => 'nullable|numeric|min:0',
         ];
+
+        // Se for Humana, exige a requisição por terapia. Se não, exige a global.
+        if ($this->isHumana) {
+            $rules['terapias.*.requisition_number'] = 'required|string';
+        } else {
+            $rules['requisition_number'] = 'required|string';
+        }
+
+        return $rules;
     }
     
     protected $messages = [
         'terapias.*.therapy_id.required' => 'A terapia é obrigatória.',
         'terapias.*.service_type_id.required' => 'O tipo é obrigatório.',
         'terapias.*.requested_hours.required' => 'A CH é obrigatória.',
+        'terapias.*.requisition_number.required' => 'A requisição é obrigatória para esta terapia.',
+        'requisition_number.required' => 'O número da requisição é obrigatório.',
     ];
 
-    // Escuta o evento disparado pelo botão na tabela
     #[On('abrir-modal-ch')]
     public function abrirModal($pacienteId, $mesReferencia)
     {
         $this->resetValidation();
         $this->resetForm();
 
-        $this->patient = Patient::findOrFail($pacienteId);
-        $this->month_year = $mesReferencia; // Já preenche o mês selecionado no filtro!
+        // Carrega o paciente já com o convênio para evitar consultas extras
+        $this->patient = Patient::with('agreement')->findOrFail($pacienteId);
+        $this->month_year = $mesReferencia; 
+
+        // Verifica se é convênio Humana
+        $nomeConvenio = mb_strtolower($this->patient->agreement?->name ?? '');
+        $this->isHumana = str_contains($nomeConvenio, 'humana');
 
         $this->adicionarTerapia(); // Inicia com 1 linha vazia
         $this->isModalOpen = true;
@@ -64,6 +80,7 @@ class RegistroModal extends Component
     public function resetForm()
     {
         $this->patient = null;
+        $this->isHumana = false;
         $this->month_year = '';
         $this->requisition_number = '';
         $this->terapias = [];
@@ -77,6 +94,7 @@ class RegistroModal extends Component
             'requested_hours' => '',
             'approved_hours' => '',
             'planned_hours' => '',
+            'requisition_number' => '', // Adicionado ao repeater
         ];
     }
 
@@ -90,14 +108,16 @@ class RegistroModal extends Component
     {
         $this->validate();
 
-        // Converte "2026-08" para o formato DATE "2026-08-01" do banco
         $formattedDate = $this->month_year . '-01';
 
         foreach ($this->terapias as $terapia) {
             RequestedService::create([
                 'patient_id' => $this->patient->id,
                 'month_year' => $formattedDate,
-                'requisition_number' => $this->requisition_number,
+                
+                // Salva a requisição correta dependendo do convênio
+                'requisition_number' => $this->isHumana ? $terapia['requisition_number'] : $this->requisition_number,
+                
                 'therapy_id' => $terapia['therapy_id'],
                 'service_type_id' => $terapia['service_type_id'],
                 'requested_hours' => $terapia['requested_hours'],
@@ -107,8 +127,6 @@ class RegistroModal extends Component
         }
 
         $this->closeModal();  
-
-        // Avisa a tela principal que deu tudo certo para recarregar a lista e exibir o Toast
         $this->dispatch('ch-salva-com-sucesso');
     }
 

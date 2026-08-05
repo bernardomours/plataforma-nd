@@ -42,8 +42,11 @@
                     </div>
 
                     @if($patient)
-                        <div class="mb-4 bg-blue-50 p-3 rounded-md border border-blue-100">
+                        <div class="mb-4 bg-blue-50 p-3 rounded-md border border-blue-100 flex justify-between items-center">
                             <p class="text-sm text-blue-800 font-semibold uppercase">Paciente: {{ $patient->name }}</p>
+                            @if($isHumana)
+                                <span class="bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-md font-bold">Convênio Humana</span>
+                            @endif
                         </div>
                     @endif
 
@@ -54,11 +57,13 @@
                             @error('month_year') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
                         </div>
                         
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Número da Requisição <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="requisition_number" placeholder="Ex: REQ-2026-001" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                            @error('requisition_number') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
-                        </div>
+                        @if(!$isHumana)
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Número da Requisição <span class="text-red-500">*</span></label>
+                                <input type="text" wire:model="requisition_number" placeholder="Ex: 000000-1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                @error('requisition_number') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                            </div>
+                        @endif
                     </div>
 
                     <div class="space-y-4">
@@ -70,6 +75,14 @@
                                     <button type="button" wire:click="removerTerapia({{ $index }})" class="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remover Terapia">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     </button>
+                                @endif
+
+                                @if($isHumana)
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700">Número da Requisição (Guia) <span class="text-red-500">*</span></label>
+                                        <input type="text" wire:model="terapias.{{ $index }}.requisition_number" placeholder="Ex: 000000-{{ $index + 1 }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        @error('terapias.'.$index.'.requisition_number') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
                                 @endif
 
                                 <div class="grid grid-cols-2 gap-4 mb-4">
