@@ -278,8 +278,8 @@
                                     // 1. REGRA GERAL: Todas as sessões são de 40 minutos
                                     $tempoIdealPorSessao = 40; 
 
-                                    // 2. EXCEÇÃO: Apenas Humana + ABA = 60 minutos
-                                    if (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
+                                    // 2. EXCEÇÃO: Apenas UNIMED + ABA = 60 minutos
+                                    if (str_contains($nomeConvenio, 'unimed') && str_contains($nomeTerapia, 'aba')) {
                                         $tempoIdealPorSessao = 60; 
                                     }
                                     
