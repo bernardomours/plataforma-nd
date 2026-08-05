@@ -133,7 +133,6 @@ class CargaHoraria extends Component
         $formattedDate = $this->month_year . '-01';
 
         if ($this->editingRecordId) {
-            // Atualiza apenas o único registro no modo de edição
             $dadosEdicao = $this->terapias[0];
             
             RequestedService::find($this->editingRecordId)->update([
@@ -150,7 +149,6 @@ class CargaHoraria extends Component
             session()->flash('message', 'Solicitação atualizada com sucesso!');
             
         } else {
-            // Cria múltiplos registros (Repeater)
             foreach ($this->terapias as $terapia) {
                 RequestedService::create([
                     'patient_id' => $this->patient->id,
@@ -174,7 +172,6 @@ class CargaHoraria extends Component
         $this->closeModal();  
     }
 
-    // Removi o "saveAndCreateAnother" porque o array já resolve isso em uma tacada só.
     
     public function deleteRecord($id)
     {

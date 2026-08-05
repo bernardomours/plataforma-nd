@@ -15,7 +15,6 @@ class AlertasPendentes extends Component
     public $visitaSelecionadaId = null;
     public $visitaSelecionadaInfo = [];
 
-    // Abre o modal e carrega os dados básicos para exibir
     public function abrirOpcoes($id)
     {
         $visita = Visit::with(['patient'])->find($id);
@@ -23,7 +22,6 @@ class AlertasPendentes extends Component
         if ($visita) {
             $this->visitaSelecionadaId = $visita->id;
             
-            // Formatamos os dados para mostrar no modal
             $this->visitaSelecionadaInfo = [
                 'paciente' => $visita->patient->name ?? 'Paciente não encontrado',
                 'tipo' => $visita->type instanceof \App\Enums\VisitType ? $visita->type->getLabel() : $visita->type,
@@ -54,11 +52,18 @@ class AlertasPendentes extends Component
         $dataLimite = Carbon::now()->subDays(10);
         $user = auth()->user();
 
-        // Inicia a query base
         $query = Visit::with(['patient', 'professional', 'therapy'])
             ->whereIn('type', [VisitType::Coordination, VisitType::Supervision]) 
             ->where('status', VisitStatus::Pending) 
             ->where('created_at', '<=', $dataLimite);
+
+        $allowedUnits = $user->getAllowedUnitIds();
+        
+        if ($allowedUnits !== null) {
+            $query->whereHas('patient', function ($q) use ($allowedUnits) {
+                $q->whereIn('unit_id', $allowedUnits);
+            });
+        }
 
         if ($user->hasAnyRole(['coordinator', 'supervisor'])) {
             $profissional = Professional::where('user_id', $user->id)->first();
@@ -70,7 +75,6 @@ class AlertasPendentes extends Component
             }
         }
 
-        // Executa a busca ordenando pelos mais antigos primeiro
         $visitasAtrasadas = $query->orderBy('created_at', 'asc')->get();
 
         return view('livewire.dashboard.alertas-pendentes', [

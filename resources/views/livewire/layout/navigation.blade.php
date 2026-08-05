@@ -82,6 +82,13 @@ new class extends Component
                 </button>
 
                 <div x-show="isOpen" x-transition class="space-y-1">
+
+                    <a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="{{ request()->routeIs('terapias-realizadas.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+                        <svg class="{{ request()->routeIs('terapias-realizadas.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                        Terapias Realizadas
+                    </a>
                     
                     @hasanyrole('admin|manager')
                         <a href="{{ route('relatorios.geral') }}" wire:navigate 
@@ -91,21 +98,12 @@ new class extends Component
                             </svg>
                             <span class="font-medium text-sm">Relatórios Gerais</span>
                         </a>
-                    @endhasanyrole
 
-                    <a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="{{ request()->routeIs('terapias-realizadas.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-                        <svg class="{{ request()->routeIs('terapias-realizadas.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                        </svg>
-                        Terapias Realizadas
-                    </a>
-
-                    @hasanyrole('admin|manager|administrative')
                         <a href="{{ route('ch-solicitada.index') }}" wire:navigate class="{{ request()->routeIs('ch-solicitada.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
                             <svg class="{{ request()->routeIs('ch-solicitada.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            CH - Solicitada
+                            Controle de CH
                         </a>
 
                         <a href="{{ route('avaliacoes-neuro.index') }}" wire:navigate class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
@@ -113,6 +111,15 @@ new class extends Component
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                             </svg>
                             Avaliações Neuro
+                        </a>
+                    @endhasanyrole
+
+                    @hasanyrole('admin|manager|administrative')
+                        <a href="{{ route('ch.solicitacao') }}" wire:navigate class="{{ request()->routeIs('ch.solicitacao') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+                            <svg class="{{ request()->routeIs('ch.solicitacao') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                            Solicitação de CH
                         </a>
                     @endhasanyrole
 
@@ -359,7 +366,7 @@ new class extends Component
                             <svg class="{{ request()->routeIs('ch-solicitada.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            CH - Solicitada
+                            Controle de CH
                         </a>
 
                         <a href="{{ route('avaliacoes-neuro.index') }}" wire:navigate class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">

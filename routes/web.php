@@ -37,6 +37,7 @@ use App\Livewire\AuditoriaHumana\Index as AtendimentoHumanaIndex;
 use App\Livewire\Qualidade\Index as QualidadeIndex;
 use App\Livewire\Qualidade\Create as QualidadeCreate;
 use App\Livewire\Qualidade\Edit as QualidadeEdit;
+use App\Livewire\ChSolicitada\Pendencias as ChPendencias;
 
 Route::redirect('/', '/dashboard');
 
@@ -68,16 +69,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin|manager|administrative')->group(function () {
         Route::get('/terapias-realizadas/cadastrar', TerapiasRealizadasCreate::class)->name('terapias-realizadas.create');
         Route::get('/terapias-realizadas/{id}/editar', TerapiasRealizadasEdit::class)->name('terapias-realizadas.edit');
-        Route::get('/ch-solicitada', ChSolicitadaIndex::class)->name('ch-solicitada.index');
-        Route::get('/avaliacoes-neuro', AvaliacoesNeuroIndex::class)->name('avaliacoes-neuro.index');
         Route::get('/avaliacoes-neuro/registrar', AvaliacoesNeuroCreate::class)->name('avaliacoes-neuro.create');
         Route::get('/avaliacoes-neuro/{assessment}/diario', AvaliacoesNeuroEdit::class)->name('avaliacoes-neuro.edit');
         Route::get('/profissionais', ProfissionaisIndex::class)->name('profissionais.index');
         Route::get('/profissionais/cadastrar', ProfissionaisCreate::class)->name('profissionais.create');
         Route::get('/profissionais/{professional}/editar', ProfissionaisEdit::class)->name('profissionais.edit');
+        Route::get('/solicitacao-ch', ChPendencias::class)->name('ch.solicitacao');
     });
 
-    Route::get('/relatorio-geral', RelatorioGeral::class)->middleware('role:admin|manager')->name('relatorios.geral');
+    Route::middleware('role:admin|manager')->group(function () {
+        Route::get('/relatorio-geral', RelatorioGeral::class)->name('relatorios.geral');
+        Route::get('/ch-solicitada', ChSolicitadaIndex::class)->name('ch-solicitada.index');
+        Route::get('/avaliacoes-neuro', AvaliacoesNeuroIndex::class)->name('avaliacoes-neuro.index');
+    });
 
     // ADMINISTRAÇÃO
     Route::middleware('role:admin')->group(function () {
