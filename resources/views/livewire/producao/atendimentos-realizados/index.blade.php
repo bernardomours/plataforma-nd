@@ -307,7 +307,7 @@
                                         $minutosRestantes = $minutosMinimosEsperados % 60;
                                         $formatadoMinimo = sprintf('%02d:%02d', $horasMinimas, $minutosRestantes);
                                         
-                                        $motivoAlerta = "Gap Detectado: O mínimo esperado era de {$formatadoMinimo} h.";
+                                        $motivoAlerta = "O mínimo esperado era de {$formatadoMinimo} h.";
                                     }
                                     
                                     $duracao = $inicio->diff($fim)->format('%H:%I');
