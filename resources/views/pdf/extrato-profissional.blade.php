@@ -51,7 +51,7 @@
                         @if($atendimento->is_glosado)
                             <span class="badge-glosa">GLOSADO</span>
                         @else
-                            Pago
+                            Considerado
                         @endif
                     </td>
                 </tr>

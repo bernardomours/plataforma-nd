@@ -275,21 +275,25 @@
                                     $nomeConvenio = mb_strtolower($appointment->patient?->agreement?->name ?? '');
                                     $nomeTerapia = mb_strtolower($appointment->therapy?->name ?? '');
                                     
-                                    $tempoIdealPorSessao = 60; 
+                                    // 1. REGRA GERAL: Todas as sessões são de 40 minutos
+                                    $tempoIdealPorSessao = 40; 
 
+                                    // 2. EXCEÇÃO: Apenas Humana + ABA = 60 minutos
                                     if (str_contains($nomeConvenio, 'humana') && str_contains($nomeTerapia, 'aba')) {
-                                        $tempoIdealPorSessao = 40; 
+                                        $tempoIdealPorSessao = 60; 
                                     }
                                     
+                                    // 3. Calcula o tempo total multiplicando pelo número de sessões
                                     $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
-                                    $minutosMinimosEsperados = $tempoTotalIdeal - 30;
-
-                                    if ($minutosMinimosEsperados < 30) {
-                                        $minutosMinimosEsperados = 30;
-                                    }
                                     
+                                    // 4. TOLERÂNCIA: Abate 10 minutos do tempo total esperado
+                                    $minutosMinimosEsperados = $tempoTotalIdeal - 10;
+
+                                    // Verifica se o tempo realizado foi menor que o mínimo esperado
                                     if ($minutos < $minutosMinimosEsperados) {
                                         $alertaVermelho = true;
+                                        
+                                        // Formata a mensagem de erro para horas e minutos
                                         $horasMinimas = floor($minutosMinimosEsperados / 60);
                                         $minutosRestantes = $minutosMinimosEsperados % 60;
                                         $formatadoMinimo = sprintf('%02d:%02d', $horasMinimas, $minutosRestantes);
