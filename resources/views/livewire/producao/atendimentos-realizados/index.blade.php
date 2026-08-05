@@ -275,19 +275,21 @@
                                     $nomeConvenio = mb_strtolower($appointment->patient?->agreement?->name ?? '');
                                     $nomeTerapia = mb_strtolower($appointment->therapy?->name ?? '');
                                     
-                                    // 1. REGRA GERAL: Todas as sessões são de 40 minutos
+                                    // 1. REGRA GERAL: 40 minutos por sessão com 10 min de tolerância total
                                     $tempoIdealPorSessao = 40; 
+                                    $tolerancia = 10;
 
-                                    // 2. EXCEÇÃO: Apenas UNIMED + ABA = 60 minutos
+                                    // 2. EXCEÇÃO: Unimed + ABA = 60 minutos por sessão com 20 min de tolerância total
                                     if (str_contains($nomeConvenio, 'unimed') && str_contains($nomeTerapia, 'aba')) {
                                         $tempoIdealPorSessao = 60; 
+                                        $tolerancia = 20;
                                     }
                                     
                                     // 3. Calcula o tempo total multiplicando pelo número de sessões
                                     $tempoTotalIdeal = $qtdSessoes * $tempoIdealPorSessao;
                                     
-                                    // 4. TOLERÂNCIA: Abate 10 minutos do tempo total esperado
-                                    $minutosMinimosEsperados = $tempoTotalIdeal - 10;
+                                    // 4. TOLERÂNCIA: Abate a tolerância correta do tempo total esperado
+                                    $minutosMinimosEsperados = $tempoTotalIdeal - $tolerancia;
 
                                     // Verifica se o tempo realizado foi menor que o mínimo esperado
                                     if ($minutos < $minutosMinimosEsperados) {
