@@ -221,8 +221,22 @@
             </table>
         </div>
 
-        <div class="py-3 px-4 border-t border-gray-200">
-            {{ $profissionais->links() }}
+        <div class="py-3 px-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <!-- Seletor de Itens por Página -->
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <label for="perPage" class="font-semibold">Itens por página:</label>
+                <select id="perPage" wire:model.live="perPage" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm py-1.5 pl-3 pr-8 cursor-pointer">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+
+            <!-- Links de Paginação do Laravel/Livewire -->
+            <div class="w-full sm:w-auto overflow-x-auto">
+                {{ $profissionais->links() }}
+            </div>
         </div>
     </div>
 

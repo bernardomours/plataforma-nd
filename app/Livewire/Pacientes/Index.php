@@ -25,6 +25,9 @@ class Index extends Component
     public $unit_id = '';
     public $agreement_id = '';
     public $trashed_filter = '';
+    
+    // VARIÁVEL NOVA: Controle de itens por página
+    public $perPage = 10;
 
     #infos para frequencia
     public $isFrequenciaModalOpen = false;
@@ -145,7 +148,8 @@ class Index extends Component
 
     public function updated($property)
     {
-        if (in_array($property, ['search', 'unit_id', 'agreement_id', 'trashed_filter'])) {
+        // Adicionamos 'perPage' aqui na lista!
+        if (in_array($property, ['search', 'unit_id', 'agreement_id', 'trashed_filter', 'perPage'])) {
             $this->resetPage();
         }
     }
@@ -190,7 +194,8 @@ class Index extends Component
 
     public function render()
     {
-        $pacientes = $this->buildPacientesQuery()->paginate(10);
+        // Passamos a variável $this->perPage em vez do 10 fixo!
+        $pacientes = $this->buildPacientesQuery()->paginate($this->perPage);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
 
@@ -238,8 +243,6 @@ class Index extends Component
 
     public function gerarFolhaUnimed()
     {
-        // (Lógica inalterada da Unimed)
-        // ...
         $this->validate([
             'frequencia_therapy_id' => 'required|exists:therapies,id',
             'frequencia_service_type_id' => 'required|exists:service_types,id',

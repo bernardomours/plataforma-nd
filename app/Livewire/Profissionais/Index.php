@@ -23,6 +23,9 @@ class Index extends Component
     public $therapy_id = '';
     public $role = '';
     public $trashed_filter = '';
+    
+    // VARIÁVEL NOVA: Controle de itens por página
+    public $perPage = 10; 
 
     // --- VARIÁVEIS DE AÇÕES EM MASSA (CHECKBOXES) ---
     public $selectedProfessionals = [];
@@ -38,10 +41,11 @@ class Index extends Component
     public $motivo_retorno = '';
     public $professionalIdToRestore = null;
 
-    // Reseta paginação se alterar filtros
+    // Reseta paginação se alterar filtros ou quantidade por página
     public function updated($property)
     {
-        if (in_array($property, ['search', 'unit_id', 'therapy_id', 'role', 'trashed_filter'])) {
+        // Adicionamos 'perPage' aqui na lista!
+        if (in_array($property, ['search', 'unit_id', 'therapy_id', 'role', 'trashed_filter', 'perPage'])) {
             $this->resetPage();
         }
     }
@@ -199,7 +203,9 @@ class Index extends Component
     public function render()
     {
         $query = $this->getProfessionalsQuery();
-        $profissionais = $query->orderBy($this->sortField, $this->sortDirection)->paginate(10);
+        
+        // Passamos a variável $this->perPage em vez do 10 fixo!
+        $profissionais = $query->orderBy($this->sortField, $this->sortDirection)->paginate($this->perPage);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
         $unidadesDisponiveis = $allowedUnitIds === null 
