@@ -15,6 +15,7 @@ use App\Models\Unit;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\WithFileUploads;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 #[Layout('layouts.app')]
 class Index extends Component
@@ -56,7 +57,14 @@ class Index extends Component
 
     private function buildQuery()
     {
-        $query = Appointment::with(['patient' => fn($q) => $q->withoutGlobalScopes(), 'therapy']);
+        // SEGURANÇA: withoutGlobalScopes() derrubava IsolatesByUnit E o SoftDeletingScope
+        // de uma vez. Aqui a intenção real é apenas continuar exibindo o paciente que já
+        // teve saída registrada (soft delete), então removemos SOMENTE o SoftDeletingScope
+        // e mantemos o isolamento por unidade ativo. Mesmo raciocínio nas ocorrências abaixo.
+        $query = Appointment::with([
+            'patient' => fn($q) => $q->withoutGlobalScope(SoftDeletingScope::class),
+            'therapy',
+        ]);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
         
@@ -76,7 +84,7 @@ class Index extends Component
 
         if (!empty($this->agreement_id)) {
             $query->whereHas('patient', function ($q) {
-                $q->withoutGlobalScopes()->where('agreement_id', $this->agreement_id);
+                $q->withoutGlobalScope(SoftDeletingScope::class)->where('agreement_id', $this->agreement_id);
             });
         }
 
@@ -90,7 +98,7 @@ class Index extends Component
 
         if (!empty($this->unit_id)) {
                     $query->whereHas('patient', function($q) {
-                        $q->withoutGlobalScopes()->where('unit_id', $this->unit_id);
+                        $q->withoutGlobalScope(SoftDeletingScope::class)->where('unit_id', $this->unit_id);
                     });
         }       
 
@@ -108,7 +116,7 @@ class Index extends Component
 
         if (!empty($this->search)) {
             $query->whereHas('patient', function($q) {
-                $q->withoutGlobalScopes()->where('name', 'like', '%' . $this->search . '%');
+                $q->withoutGlobalScope(SoftDeletingScope::class)->where('name', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -122,7 +130,9 @@ class Index extends Component
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
 
         $unitsQuery = Unit::orderBy('name');
-        $patientsQuery = Patient::withoutGlobalScopes()->orderBy('name');
+        // SEGURANÇA: mantém o isolamento por unidade (IsolatesByUnit) e remove apenas o
+        // SoftDeletingScope, para que o filtro continue listando pacientes com saída.
+        $patientsQuery = Patient::withoutGlobalScope(SoftDeletingScope::class)->orderBy('name');
         $professionalsQuery = Professional::orderBy('name');
 
         if ($allowedUnitIds !== null) {
@@ -208,11 +218,22 @@ class Index extends Component
 
     public function deleteAppointment($id)
     {
-        $appointment = Appointment::find($id); 
-        
+        // SEGURANÇA (IDOR): Appointment não tem unit_id nem global scope. Sem esta
+        // checagem, um ID no payload do Livewire permitia excluir o atendimento de um
+        // paciente de outra clínica. A unidade vem do paciente vinculado.
+        $appointment = Appointment::find($id);
+
         if ($appointment) {
+            $patientUnitId = Patient::withoutGlobalScopes()
+                ->whereKey($appointment->patient_id)
+                ->value('unit_id');
+
+            if (! auth()->user()->canAccessUnit($patientUnitId)) {
+                abort(403, 'Você não tem permissão para excluir atendimentos desta unidade.');
+            }
+
             $appointment->delete();
-            
+
             $this->dispatch('notify', 'Atendimento excluído com sucesso!');
         }
     }
@@ -334,8 +355,27 @@ class Index extends Component
         $errosDetalhados = [];
 
         // Pré-carrega dados para performance e aplica scopes se existirem
-        $todosPacientes = Patient::withoutGlobalScopes()->with(['agreement', 'unit'])->get();
-        $todosProfissionais = Professional::all();
+        // SEGURANÇA (crítico): estas duas coleções alimentam o "match" por nome do CSV.
+        // Com withoutGlobalScopes()/Professional::all() elas varriam TODAS as clínicas,
+        // então uma planilha importada por um usuário de uma unidade podia casar com um
+        // paciente/profissional de outra e gravar atendimento cruzado entre clínicas.
+        // Agora ambas respeitam as unidades permitidas ao usuário logado.
+        $allowedUnitIds = auth()->user()->getAllowedUnitIds();
+
+        // Remove só o SoftDeletingScope: pacientes com saída registrada ainda precisam
+        // ser reconhecidos no CSV, mas continuam limitados às unidades permitidas.
+        $pacientesQuery = Patient::withoutGlobalScope(SoftDeletingScope::class)
+            ->with(['agreement', 'unit']);
+
+        $profissionaisQuery = Professional::query();
+
+        if ($allowedUnitIds !== null) {
+            $pacientesQuery->whereIn('unit_id', $allowedUnitIds);
+            $profissionaisQuery->whereHas('units', fn($q) => $q->whereIn('units.id', $allowedUnitIds));
+        }
+
+        $todosPacientes = $pacientesQuery->get();
+        $todosProfissionais = $profissionaisQuery->get();
 
         // 3. Processamento Linha a Linha
         while (($row = fgetcsv($file, 0, ';')) !== false) {

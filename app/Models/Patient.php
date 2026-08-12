@@ -6,20 +6,33 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Scopes\UnitScope;
 use Illuminate\Database\Eloquent\SoftDeletes;
-// use Spatie\Activitylog\Traits\LogsActivity;
 use App\Traits\IsolatesByUnit;
-use Spatie\Activitylog\LogOptions;
+// CORREÇÃO: namespaces da v5 do spatie/laravel-activitylog. O código antigo apontava para
+// Spatie\Activitylog\Traits\LogsActivity e Spatie\Activitylog\LogOptions, que são da v4 e
+// NÃO EXISTEM no pacote instalado (5.0.0) — por isso o log estava desligado.
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class Patient extends Model
 {
     use HasFactory;
     use IsolatesByUnit;
     use SoftDeletes;
-    // use LogsActivity;
+    use LogsActivity;
 
-    protected static $recordEvents = ['created', 'updated', 'restored'];
+    /**
+     * Só 'created' e 'updated' são registrados por este model.
+     *
+     * 'deleted' e 'restored' ficam DE FORA de propósito: a saída e o retorno de paciente
+     * já são registrados via MovementHistory (que carrega o MOTIVO da saída e é o que a
+     * tela de Controles sabe interpretar). Se logássemos aqui também, cada saída geraria
+     * DUAS linhas na auditoria — a do MovementHistory, com motivo, e uma do Patient, vazia.
+     *
+     * A exclusão PERMANENTE (forceDelete) não dispara nenhum destes eventos e por isso é
+     * registrada manualmente em Pacientes/Index::forceDeletePatient().
+     */
+    protected static $recordEvents = ['created', 'updated'];
 
     /**
      * The attributes that are mass assignable.
@@ -41,6 +54,23 @@ class Patient extends Model
     ];
 
     /**
+     * SEGURANÇA (LGPD / dado sensível de saúde): oculta identificadores pessoais em
+     * serializações automáticas (toArray/toJson, respostas JSON, logs, dd()).
+     *
+     * NÃO afeta a exibição nas views: {{ $patient->cpf }} e {{ $patient->guardian_phone }}
+     * continuam funcionando normalmente, pois $hidden só age na serialização do model.
+     * Se algum dia for preciso serializar esses campos, use ->makeVisible([...]) no ponto exato.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'cpf',
+        'guardian_name',
+        'guardian_phone',
+        'agreement_number',
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -54,14 +84,36 @@ class Patient extends Model
         ];
     }
 
-    // public function getActivitylogOptions(): LogOptions
-    // {
-    //     return LogOptions::defaults()
-    //         ->logOnly(['name', 'unit_id', 'agreement_id', 'status', 'birth_date', 'guardian_name', 'guardian_phone']) 
-    //         ->logOnlyDirty()
-    //         ->dontSubmitEmptyLogs()
-    //         ->dontLogIfAttributesChangedOnly(['updated_at']);
-    // }
+    /**
+     * Campos do cadastro do paciente que entram na auditoria (tela Controles).
+     *
+     * Duas correções em relação à versão comentada anterior:
+     *  - 'status' foi removido: essa coluna NÃO existe em patients (a real é 'is_active').
+     *    Pedir um atributo inexistente gravava sempre null e poluía o diff.
+     *  - dontSubmitEmptyLogs() virou dontLogEmptyChanges(): o método foi renomeado na v5.
+     *    Com o nome antigo, ativar o trait daria erro fatal.
+     *
+     * 'unit_id' é logado de propósito: é o que permite auditar transferência de clínica.
+     * O $hidden do model não interfere aqui — a v5 lê via getAttribute(), que ignora $hidden.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'name',
+                'birth_date',
+                'cpf',
+                'guardian_name',
+                'guardian_phone',
+                'unit_id',
+                'agreement_id',
+                'agreement_number',
+                'is_active',
+            ])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->dontLogIfAttributesChangedOnly(['updated_at']);
+    }
 
     public function patientServices()
     {

@@ -97,6 +97,45 @@ class User extends Authenticatable
         return $this->units()->pluck('units.id')->toArray();
     }
 
+    /**
+     * SEGURANÇA (multi-tenant): valida se o usuário pode operar sobre UMA unidade.
+     * Usado para models que possuem a coluna unit_id (ex.: Patient).
+     *
+     * Mantém exatamente o mesmo contrato de getAllowedUnitIds(): null = acesso global
+     * (admin/manager), array = restrito. Assim a regra de "quem enxerga o quê" continua
+     * definida em um único lugar.
+     */
+    public function canAccessUnit(?int $unitId): bool
+    {
+        $allowed = $this->getAllowedUnitIds();
+
+        if ($allowed === null) {
+            return true;
+        }
+
+        return $unitId !== null && in_array((int) $unitId, array_map('intval', $allowed), true);
+    }
+
+    /**
+     * SEGURANÇA (multi-tenant): valida vínculos multi-unidade, onde o relacionamento é
+     * por tabela pivô e não por coluna unit_id — caso do Professional (professional_unit).
+     * Basta UMA unidade em comum para liberar, que é a regra já usada nas listagens
+     * (whereHas('units', fn($q) => $q->whereIn('units.id', $allowed))).
+     */
+    public function canAccessAnyUnit(array $unitIds): bool
+    {
+        $allowed = $this->getAllowedUnitIds();
+
+        if ($allowed === null) {
+            return true;
+        }
+
+        return count(array_intersect(
+            array_map('intval', $unitIds),
+            array_map('intval', $allowed)
+        )) > 0;
+    }
+
     public function qualityProcesses()
     {
         return $this->belongsToMany(QualityProcess::class, 'quality_process_user');

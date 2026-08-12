@@ -2,3 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 @import 'tom-select/dist/css/tom-select.css';
+
+/* x-cloak é usado em várias telas (login, notificações do prontuário), mas não tinha
+   regra CSS definida — o elemento aparecia por um instante antes do Alpine inicializar.
+   Esta é a regra padrão recomendada pelo Alpine. */
+[x-cloak] {
+    display: none !important;
+}

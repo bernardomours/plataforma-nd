@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Enums\ProfessionalRole;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 #[Layout('layouts.app')]
 class Create extends Component
@@ -30,8 +31,24 @@ class Create extends Component
             'email' => 'nullable|email|max:255',
             'role' => 'required',
             'selectedUnits' => 'required|array|min:1',
+            // SEGURANÇA: impede cadastrar profissional em unidade que o usuário não
+            // administra (validação no backend, não só no select da view).
+            'selectedUnits.*' => ['integer', Rule::in($this->unidadesPermitidas()->pluck('id')->all())],
             'selectedTherapies' => 'nullable|array',
         ];
+    }
+
+    /**
+     * SEGURANÇA (multi-tenant): unidades atribuíveis pelo usuário logado.
+     * null em getAllowedUnitIds() = admin/manager = acesso global.
+     */
+    private function unidadesPermitidas()
+    {
+        $allowedUnitIds = auth()->user()->getAllowedUnitIds();
+
+        return $allowedUnitIds === null
+            ? Unit::all()
+            : Unit::whereIn('id', $allowedUnitIds)->get();
     }
 
     public function messages()
@@ -115,7 +132,8 @@ class Create extends Component
     public function render()
     {
         return view('livewire.profissionais.create', [
-            'units' => Unit::all(),
+            // SEGURANÇA: select restrito às unidades permitidas ao usuário.
+            'units' => $this->unidadesPermitidas(),
             'therapies' => Therapy::all(),
             'roles' => ProfessionalRole::cases()
         ]);

@@ -72,13 +72,37 @@ class Edit extends Component
             'agreement_number' => 'required|string',
             'guardian_name' => 'nullable|string|max:255',
             'guardian_phone' => 'nullable|string|max:20',
-            'unit_id' => 'required|exists:units,id',
+            // SEGURANÇA (item 7): 'exists:units,id' aceitava qualquer unidade do sistema —
+            // era possível transferir um paciente para uma clínica que o usuário não
+            // administra (e perder o acesso a ele, ou movê-lo indevidamente).
+            // Restringe às unidades permitidas + a unidade atual do paciente (para não
+            // quebrar o save de quem só edita outros campos).
+            'unit_id' => ['required', 'integer', Rule::in($this->unidadesAtribuiveisIds())],
             'agreement_id' => 'required|exists:agreements,id',
             
             'patientServices.*.service_type_id' => 'required|exists:service_types,id',
             'patientServices.*.coordinator_id' => 'nullable|exists:professionals,id',
             'patientServices.*.supervisor_id' => 'nullable|exists:professionals,id',
         ];
+    }
+
+    /**
+     * SEGURANÇA (multi-tenant): unidades que o usuário logado pode gravar neste paciente.
+     * Inclui a unidade atual do registro para que a edição de outros campos não falhe
+     * caso o paciente esteja numa unidade fora do escopo do usuário.
+     */
+    private function unidadesAtribuiveisIds(): array
+    {
+        $allowedUnitIds = auth()->user()->getAllowedUnitIds();
+
+        $permitidas = $allowedUnitIds === null
+            ? Unit::pluck('id')->all()
+            : $allowedUnitIds;
+
+        return array_values(array_unique(array_merge(
+            array_map('intval', $permitidas),
+            [(int) $this->patient->unit_id]
+        )));
     }
 
     public function addService()
@@ -128,6 +152,15 @@ class Edit extends Component
             $this->dispatch('notify', type: 'success', message: 'Cadastro atualizado com sucesso!');
 
         } catch (\Exception $e) {
+            // OBSERVABILIDADE (item 12): o catch silencioso mascarava falhas de integridade
+            // (ex.: FK de patient_services). Loga o contexto sem expor nada ao usuário —
+            // a mensagem genérica na tela permanece exatamente a mesma.
+            \Log::error('Falha ao atualizar paciente', [
+                'patient_id' => $this->patient->id,
+                'user_id'    => auth()->id(),
+                'exception'  => $e->getMessage(),
+            ]);
+
             // Se algo der errado no banco, NÃO fecha o modal e avisa o erro
             $this->dispatch('notify', type: 'error', message: 'Erro ao salvar: verifique os dados ou tente novamente.');
         }
@@ -138,7 +171,10 @@ class Edit extends Component
         $coordinators = collect();
         $supervisors = collect();
 
-        if ($this->unit_id) {
+        // SEGURANÇA: $this->unit_id vem do payload e é usado para listar profissionais.
+        // Só consulta se a unidade estiver entre as permitidas, senão um valor adulterado
+        // devolveria a lista de coordenadores/supervisores de outra clínica.
+        if ($this->unit_id && in_array((int) $this->unit_id, $this->unidadesAtribuiveisIds(), true)) {
             $coordinators = Professional::where('role', 'coordinator')
                 ->whereHas('units', fn ($q) => $q->where('units.id', $this->unit_id))
                 ->get();
@@ -149,7 +185,9 @@ class Edit extends Component
         }
 
         return view('livewire.pacientes.edit', [
-            'units' => Unit::all(),
+            // SEGURANÇA: o select só oferece unidades permitidas (+ a atual do paciente),
+            // espelhando exatamente a regra validada no backend.
+            'units' => Unit::whereIn('id', $this->unidadesAtribuiveisIds())->get(),
             'agreements' => Agreement::all(),
             'serviceTypes' => ServiceType::all(),
             'coordinators' => $coordinators,

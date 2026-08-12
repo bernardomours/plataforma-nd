@@ -26,13 +26,29 @@
 
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl border border-gray-200">
             
-            <div class="p-4 border-b border-gray-100 flex justify-end">
+            <div class="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
+                {{-- Filtro por clínica: permite acompanhar a movimentação de uma unidade específica --}}
+                <div class="w-full md:w-1/4">
+                    <select wire:model.live="unit_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="">Todas as clínicas</option>
+                        @foreach($unidadesFiltro as $unidade)
+                            <option value="{{ $unidade->id }}">{{ $unidade->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="relative w-full md:w-1/3">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Pesquisar..." class="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                 </div>
+
+                @if($search || $unit_id)
+                    <button wire:click="clearFilters" type="button" class="text-sm font-semibold text-gray-500 hover:text-gray-900 whitespace-nowrap">
+                        Limpar filtros
+                    </button>
+                @endif
             </div>
 
             <div class="overflow-x-auto">
@@ -43,6 +59,7 @@
                             <th class="py-3 px-6 font-bold text-gray-900 text-xs tracking-wider uppercase">Usuário</th>
                             <th class="py-3 px-6 font-bold text-gray-900 text-xs tracking-wider uppercase">Ação</th>
                             <th class="py-3 px-6 font-bold text-gray-900 text-xs tracking-wider uppercase">Onde mexeu</th>
+                            <th class="py-3 px-6 font-bold text-gray-900 text-xs tracking-wider uppercase">Clínica</th>
                             <th class="py-3 px-6 font-bold text-gray-900 text-xs tracking-wider uppercase">Detalhes da Mudança</th>
                         </tr>
                     </thead>
@@ -187,8 +204,15 @@
                                 </td>
 
                                 <td class="py-4 px-6 text-gray-700">
-                                    <span class="font-medium text-gray-900">{{ $modeloNome }}</span> 
+                                    <span class="font-medium text-gray-900">{{ $modeloNome }}</span>
                                     <span class="text-gray-500 font-semibold">({{ mb_strtoupper($subjectName) }})</span>
+                                </td>
+
+                                {{-- Clínica onde a movimentação aconteceu. Resolvida no componente porque
+                                     cada tipo de registo chega à unidade por um caminho diferente
+                                     (paciente = unit_id; profissional = pivô; movimentação = via moveable). --}}
+                                <td class="py-4 px-6 text-gray-700">
+                                    {{ $this->unidadeDoRegistro($atividade) }}
                                 </td>
 
                                 <td class="py-4 px-6 text-gray-700 max-w-sm whitespace-normal text-sm">
@@ -246,7 +270,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="py-12 text-center text-gray-500">
+                                <td colspan="6" class="py-12 text-center text-gray-500">
                                     Nenhum registro de atividade encontrado.
                                 </td>
                             </tr>

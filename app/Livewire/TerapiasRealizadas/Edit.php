@@ -9,6 +9,7 @@ use App\Models\Patient;
 use App\Models\Therapy;
 use App\Models\ServiceType;
 use App\Models\Professional;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 #[Layout('layouts.app')]
 class Edit extends Component
@@ -31,15 +32,11 @@ class Edit extends Component
         $appointment = Appointment::findOrFail($id);
         $this->appointmentId = $appointment->id;
 
-        // SEGURANÇA: Valida se o agendamento pertence a uma unidade permitida para o usuário
-        $allowedUnitIds = auth()->user()->getAllowedUnitIds();
-        if ($allowedUnitIds !== null) {
-            // Verifica a unidade através do paciente vinculado
-            $patientUnitId = Patient::withoutGlobalScopes()->where('id', $appointment->patient_id)->value('unit_id');
-            if (!in_array($patientUnitId, $allowedUnitIds)) {
-                abort(403, 'Acesso não autorizado a esta unidade.');
-            }
-        }
+        // SEGURANÇA: Valida se o agendamento pertence a uma unidade permitida para o usuário.
+        // O withoutGlobalScopes() aqui é intencional: precisamos ler o unit_id REAL do
+        // paciente (mesmo de outra unidade / com saída registrada) para poder NEGAR — se
+        // aplicássemos o scope viria null e não distinguiríamos "não existe" de "é de outra".
+        $this->authorizeAppointmentUnit($appointment->patient_id);
 
         // Inicialização das propriedades
         $this->patient_id = $appointment->patient_id;
@@ -52,6 +49,21 @@ class Edit extends Component
         $this->check_in = $appointment->check_in ? \Carbon\Carbon::parse($appointment->check_in)->format('H:i') : null;
         $this->check_out = $appointment->check_out ? \Carbon\Carbon::parse($appointment->check_out)->format('H:i') : null;
         $this->session_number = $appointment->session_number;
+    }
+
+    /**
+     * SEGURANÇA (multi-tenant): a unidade de um Appointment é a unidade do paciente.
+     * Centraliza a checagem usada no mount() e no save().
+     */
+    private function authorizeAppointmentUnit($patientId): void
+    {
+        $patientUnitId = Patient::withoutGlobalScopes()
+            ->whereKey($patientId)
+            ->value('unit_id');
+
+        if (! auth()->user()->canAccessUnit($patientUnitId)) {
+            abort(403, 'Acesso não autorizado a esta unidade.');
+        }
     }
 
     public function rules()
@@ -104,7 +116,8 @@ class Edit extends Component
         $sessionDuration = 40;
 
         if (!empty($this->patient_id) && !empty($this->therapy_id)) {
-            $patient = Patient::withoutGlobalScopes()->with('agreement')->find($this->patient_id);
+            // SEGURANÇA: mantém IsolatesByUnit, ignora só o soft delete.
+            $patient = Patient::withoutGlobalScope(SoftDeletingScope::class)->with('agreement')->find($this->patient_id);
             $therapy = Therapy::find($this->therapy_id);
 
             if ($patient && $therapy) {
@@ -132,7 +145,12 @@ class Edit extends Component
         $this->validate();
 
         $appointment = Appointment::findOrFail($this->appointmentId);
-        
+
+        // SEGURANÇA: re-checa no save() — o Livewire re-hidrata sem executar mount(), e
+        // valida também o paciente de DESTINO (o payload pode trocar patient_id).
+        $this->authorizeAppointmentUnit($appointment->patient_id);
+        $this->authorizeAppointmentUnit($this->patient_id);
+
         $appointment->update([
             'patient_id' => $this->patient_id,
             'therapy_id' => $this->therapy_id,
@@ -153,7 +171,8 @@ class Edit extends Component
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
 
         // 1. Inicia as queries
-        $patientsQuery = Patient::withoutGlobalScopes()->orderBy('name');
+        // SEGURANÇA: preserva o isolamento por unidade, removendo apenas o SoftDeletingScope.
+        $patientsQuery = Patient::withoutGlobalScope(SoftDeletingScope::class)->orderBy('name');
         $professionalsQuery = Professional::orderBy('name');
 
         // 2. Aplica as regras de segurança (Multi-tenancy)

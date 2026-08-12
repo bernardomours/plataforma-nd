@@ -10,6 +10,7 @@ use App\Models\Therapy;
 use App\Models\ServiceType;
 use App\Models\Professional;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 #[Layout('layouts.app')]
 class Create extends Component
@@ -83,7 +84,9 @@ class Create extends Component
         $sessionDuration = 40;
 
         if (!empty($this->patient_id) && !empty($this->therapy_id)) {
-            $patient = Patient::withoutGlobalScopes()->with('agreement')->find($this->patient_id);
+            // SEGURANÇA: mantém IsolatesByUnit ativo (só ignora o soft delete). Se o ID
+            // for de outra unidade, vem null e o cálculo cai no default — sem vazar dados.
+            $patient = Patient::withoutGlobalScope(SoftDeletingScope::class)->with('agreement')->find($this->patient_id);
             $therapy = Therapy::find($this->therapy_id);
 
             if ($patient && $therapy) {
@@ -116,6 +119,16 @@ class Create extends Component
     private function performSave()
     {
         $this->validate();
+
+        // SEGURANÇA: 'exists:patients,id' aceita QUALQUER paciente do banco, inclusive de
+        // outra clínica. Confirma a unidade antes de gravar o atendimento.
+        $patientUnitId = Patient::withoutGlobalScopes()
+            ->whereKey($this->patient_id)
+            ->value('unit_id');
+
+        if (! auth()->user()->canAccessUnit($patientUnitId)) {
+            abort(403, 'Paciente fora das unidades permitidas.');
+        }
 
         return Appointment::create([
             'patient_id' => $this->patient_id,
@@ -153,8 +166,9 @@ class Create extends Component
     {
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
 
-        $patientsQuery = Patient::withoutGlobalScopes()->orderBy('name');
-        
+        // SEGURANÇA: preserva o isolamento por unidade, removendo apenas o SoftDeletingScope.
+        $patientsQuery = Patient::withoutGlobalScope(SoftDeletingScope::class)->orderBy('name');
+
         $professionalsQuery = Professional::orderBy('name');
 
         if ($allowedUnitIds !== null) {

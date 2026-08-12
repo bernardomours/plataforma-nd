@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\UnitScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Activitylog\LogOptions;
+// CORREÇÃO: namespaces da v5. O trait continua DESATIVADO (não há `use LogsActivity;` no
+// corpo da classe) porque a auditoria pedida cobre paciente e profissional, não atendimento.
+// Mas os imports apontavam para classes da v4 que não existem: o getActivitylogOptions()
+// abaixo tem retorno tipado LogOptions e daria erro fatal no instante em que alguém
+// ativasse o trait. Corrigido o namespace e o método renomeado na v5, para que ativar
+// passe a ser questão de acrescentar uma linha.
+use Spatie\Activitylog\Support\LogOptions;
 
 class Appointment extends Model
 {
@@ -50,9 +54,9 @@ class Appointment extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['patient_id', 'professional_id', 'therapy_id', 'appointment_date', 'status'])
+            ->logOnly(['patient_id', 'professional_id', 'therapy_id', 'appointment_date'])
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs()
+            ->dontLogEmptyChanges()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 

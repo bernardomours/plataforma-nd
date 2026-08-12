@@ -9,6 +9,7 @@ use App\Models\Agreement;
 use App\Models\ServiceType;
 use Illuminate\Database\Seeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,12 +17,19 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        User::factory()->create([
+        // CORREÇÃO (item 8): a coluna users.is_admin foi REMOVIDA na migration
+        // 2026_04_02_105446_add_role_to_users_table — este seeder quebrava ao rodar.
+        // A fonte única de verdade para administrador é a role do Spatie ('admin'),
+        // que é o que isAdmin() e o middleware role: já usam em todo o sistema.
+        $admin = User::factory()->create([
             'name' => 'teste admin',
             'email' => 'a@a',
             'password' => '123',
-            'is_admin' => true,
         ]);
+
+        $admin->assignRole(
+            Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web'])
+        );
 
         $terapias = [
             ['name' => 'ABA'],

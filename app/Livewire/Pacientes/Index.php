@@ -26,7 +26,7 @@ class Index extends Component
     public $agreement_id = '';
     public $trashed_filter = '';
     
-    // VARIÁVEL NOVA: Controle de itens por página
+    #Controle de itens por página
     public $perPage = 10;
 
     #infos para frequencia
@@ -112,6 +112,10 @@ class Index extends Component
 
     public function restorePatient($patientId)
     {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para restaurar pacientes.');
+        }
+
         $paciente = Patient::withTrashed()->find($patientId);
         if ($paciente) {
             $paciente->restore();
@@ -129,12 +133,27 @@ class Index extends Component
 
     public function forceDeletePatient($patientId)
     {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para excluir pacientes definitivamente.');
+        }
+
         $paciente = Patient::withTrashed()->find($patientId);
         if ($paciente) {
-            // Se houver relações (como movementHistories ou avaliações) que precisem de 
-            // ser apagadas antes do paciente, coloque-as aqui. Opcionalmente:
-            // $paciente->movementHistories()->delete(); 
-            
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($paciente)
+                ->event('deleted')
+                ->withProperties([
+                    'attributes' => [
+                        'exclusao'         => 'PERMANENTE (irreversível)',
+                        'name'             => $paciente->name,
+                        'cpf'              => $paciente->cpf,
+                        'unit_id'          => $paciente->unit_id,
+                        'agreement_number' => $paciente->agreement_number,
+                    ],
+                ])
+                ->log('Paciente excluído permanentemente do banco de dados');
+
             $paciente->forceDelete();
             session()->flash('message', 'Paciente excluído permanentemente do banco de dados.');
         }
@@ -148,7 +167,6 @@ class Index extends Component
 
     public function updated($property)
     {
-        // Adicionamos 'perPage' aqui na lista!
         if (in_array($property, ['search', 'unit_id', 'agreement_id', 'trashed_filter', 'perPage'])) {
             $this->resetPage();
         }
@@ -167,7 +185,6 @@ class Index extends Component
             $query->where('name', 'like', '%' . $this->search . '%');
         }
 
-        // Blindagem de segurança por unidade (garantindo que não vê pacientes de outras clínicas)
         $allowedUnits = auth()->user()->getAllowedUnitIds();
         if ($allowedUnits !== null) {
             $query->whereIn('unit_id', $allowedUnits);
@@ -181,7 +198,6 @@ class Index extends Component
             $query->where('agreement_id', $this->agreement_id);
         }
 
-        // Lógica da Lixeira
         if ($this->trashed_filter === 'with_trashed') {
             $query->withTrashed();
         } elseif ($this->trashed_filter === 'only_trashed') {
@@ -194,13 +210,11 @@ class Index extends Component
 
     public function render()
     {
-        // Passamos a variável $this->perPage em vez do 10 fixo!
         $pacientes = $this->buildPacientesQuery()->paginate($this->perPage);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();
 
         $conveniosStats = Agreement::withCount(['patients' => function ($q) use ($allowedUnitIds) {
-            // Ao contar estatísticas, respeitar as unidades permitidas E remover os excluídos da conta
             if ($allowedUnitIds !== null) {
                 $q->whereIn('unit_id', $allowedUnitIds);
             }
@@ -223,7 +237,6 @@ class Index extends Component
         ]);
     }
 
-    // ... (As funções do Modal de Frequência e Unimed permanecem iguais)
     public function openFrequenciaModal($patientId)
     {
         $this->resetValidation();

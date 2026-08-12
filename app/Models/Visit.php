@@ -7,8 +7,8 @@ use App\Enums\VisitType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Activitylog\LogOptions;
+// CORREÇÃO: mesmo caso do Appointment — namespaces da v5. Trait segue desativado.
+use Spatie\Activitylog\Support\LogOptions;
 
 class Visit extends Model
 {
@@ -69,7 +69,7 @@ class Visit extends Model
         return LogOptions::defaults()
             ->logOnly(['patient_id', 'professional_id', 'type', 'status', 'happened_at'])
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs()
+            ->dontLogEmptyChanges()
             ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 }
