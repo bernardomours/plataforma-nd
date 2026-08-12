@@ -1,50 +1,54 @@
 <div>
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900">CH - Solicitada</h1>
-        <p class="text-sm text-gray-500 mt-1">Registro de todas as cargas horárias solicitadas, liberadas e planejadas</p>
+        <p class="text-sm text-gray-500 mt-1">Registro de todas as sessões solicitadas, liberadas e planejadas</p>
     </div>
 
     <div class="max-w-full mx-auto py-6 sm:px-6 lg:px-8">
 
-        {{-- ══════════════ Indicadores de carga horária ══════════════ --}}
+        {{-- ══════════════ Indicadores ══════════════
+             Os campos requested/approved/planned são contagens de SESSÕES, não horas.
+             Os rótulos foram ajustados para refletir isso: a tela exibia "Horas" em
+             valores que sempre foram sessões, e ainda misturava a realizada em formato
+             de relógio (00:40) com as demais em número — o que impedia qualquer
+             comparação direta entre as colunas.                                        --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute right-0 top-0 w-2 h-full bg-orange-400"></div>
-                <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Solicitadas</h3>
-                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($totalHorasSolicitadas, 0, ',', '.') }}</p>
+                <h3 class="text-sm font-semibold text-gray-500 mb-2">Sessões Solicitadas</h3>
+                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($stats->solicitadas, 0, ',', '.') }}</p>
                 <div class="flex items-center text-sm text-orange-500 font-medium gap-1">
-                    <span>Total das horas solicitadas</span>
+                    <span>Total pedido ao convênio</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
-                <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Autorizadas</h3>
-                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($totalHorasLiberadas, 0, ',', '.') }}</p>
+                <h3 class="text-sm font-semibold text-gray-500 mb-2">Sessões Autorizadas</h3>
+                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($stats->aprovadas, 0, ',', '.') }}</p>
                 <div class="flex items-center text-sm text-green-600 font-medium gap-1">
-                    <span>Total das horas autorizadas</span>
+                    <span>Total liberado pelo convênio</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute right-0 top-0 w-2 h-full bg-blue-500"></div>
-                <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Planejadas</h3>
-                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($totalHorasPlanejadas, 0, ',', '.') }}</p>
+                <h3 class="text-sm font-semibold text-gray-500 mb-2">Sessões Planejadas</h3>
+                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($stats->planejadas, 0, ',', '.') }}</p>
                 <div class="flex items-center text-sm text-blue-500 font-medium gap-1">
-                    <span>Total das horas planejadas</span>
+                    <span>Equivalente mensal (semanal × {{ $semanasNoMes }})</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute right-0 top-0 w-2 h-full bg-purple-500"></div>
-                <h3 class="text-sm font-semibold text-gray-500 mb-2">Horas Realizadas</h3>
-                <p class="text-3xl font-bold text-gray-900 mb-3">{{ $this->formatTime($totalHorasRealizadas) }}</p>
+                <h3 class="text-sm font-semibold text-gray-500 mb-2">Sessões Realizadas</h3>
+                <p class="text-3xl font-bold text-gray-900 mb-3">{{ number_format($stats->realizadas, 0, ',', '.') }}</p>
                 <div class="flex items-center text-sm text-purple-600 font-medium gap-1">
-                    <span>Total das horas realizadas</span>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>{{ number_format($stats->atendimentos, 0, ',', '.') }} atendimentos · {{ $this->formatTime($stats->horas_realizadas) }}</span>
                 </div>
             </div>
         </div>
@@ -55,7 +59,10 @@
             <div class="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="text-base font-bold text-gray-900">Análise de Faltas</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Carga horária realizada comparada à planejada, no período filtrado</p>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        Sessões realizadas comparadas às planejadas no período
+                        <span class="text-gray-400">· planejamento semanal convertido para o mês (× {{ $semanasNoMes }})</span>
+                    </p>
                 </div>
 
                 @if($faixa ?? false)
@@ -77,7 +84,7 @@
                     <p class="text-xs text-amber-800 leading-relaxed">
                         <span class="font-semibold">{{ number_format($stats->sem_plano, 0, ',', '.') }}</span>
                         de {{ number_format($stats->registros, 0, ',', '.') }} registros
-                        ({{ 100 - $stats->cobertura }}%) estão <span class="font-semibold">sem carga horária planejada</span> informada
+                        ({{ 100 - $stats->cobertura }}%) estão <span class="font-semibold">sem sessões planejadas</span> informadas
                         e por isso ficam fora deste cálculo.
                         <button wire:click="filtrarPorFaixa('sem_plano')" type="button" class="underline font-semibold hover:text-amber-950">
                             Ver esses registros
@@ -110,19 +117,19 @@
                         </div>
 
                         <p class="text-xs text-gray-500 leading-relaxed">
-                            {{ $this->formatTime($stats->realizadas_com_plano) }} realizadas de
-                            {{ $this->formatTime($stats->planejadas) }} planejadas
+                            {{ number_format($stats->realizadas_com_plano, 0, ',', '.') }} sessões realizadas de
+                            {{ number_format($stats->planejadas, 0, ',', '.') }} planejadas
                             <span class="text-gray-400">({{ number_format($stats->com_plano, 0, ',', '.') }} registros)</span>
                         </p>
                     </div>
 
                     {{-- Déficit e excedente --}}
                     <div class="p-6">
-                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Horas não realizadas</h3>
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Sessões não realizadas</h3>
 
                         <div class="flex items-baseline gap-2 mb-1">
-                            <span class="text-4xl font-bold text-red-600">{{ $this->formatTime($stats->deficit) }}</span>
-                            <span class="text-sm text-gray-400 font-medium">h</span>
+                            <span class="text-4xl font-bold text-red-600">{{ number_format($stats->deficit, 0, ',', '.') }}</span>
+                            <span class="text-sm text-gray-400 font-medium">sessões</span>
                         </div>
                         <p class="text-xs text-gray-500 mb-4">Soma do que faltou em cada registro abaixo do planejado</p>
 
@@ -130,7 +137,7 @@
                             <div class="pt-3 border-t border-gray-100">
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs text-gray-500">Realizado acima do planejado</span>
-                                    <span class="text-sm font-bold text-blue-600">{{ $this->formatTime($stats->excedente) }}</span>
+                                    <span class="text-sm font-bold text-blue-600">+{{ number_format($stats->excedente, 0, ',', '.') }}</span>
                                 </div>
                             </div>
                         @endif
@@ -174,9 +181,10 @@
                     <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
                     </svg>
-                    <p class="text-sm font-medium text-gray-600">Sem carga horária planejada no período</p>
+                    <p class="text-sm font-medium text-gray-600">Sem planejamento informado no período</p>
                     <p class="text-xs text-gray-500 mt-1 max-w-md mx-auto leading-relaxed">
-                        O cálculo de faltas compara o realizado com o campo <span class="font-semibold">Horas Planejadas</span>.
+                        O cálculo de faltas compara as sessões realizadas com o campo
+                        <span class="font-semibold">Horas Planejadas</span> do cadastro de CH.
                         Nenhum dos {{ number_format($stats->registros, 0, ',', '.') }} registros deste filtro tem esse campo preenchido.
                     </p>
                 </div>
@@ -275,23 +283,21 @@
                             <th class="py-4 px-4">Tipo de Atendimento</th>
                             <th class="py-4 px-4">Mês/Ano</th>
                             <th class="py-4 px-4">Requisição</th>
-                            <th class="py-4 px-4 text-center">Horas Solicitadas</th>
-                            <th class="py-4 px-4 text-center">Horas Liberadas</th>
-                            <th class="py-4 px-4 text-center">Horas Planejadas</th>
-                            <th class="py-4 px-4 text-center">Horas Realizadas</th>
+                            <th class="py-4 px-4 text-center">Sessões Solicitadas</th>
+                            <th class="py-4 px-4 text-center">Sessões Liberadas</th>
+                            <th class="py-4 px-4 text-center">Planejadas / mês</th>
+                            <th class="py-4 px-4 text-center">Realizadas</th>
                             <th class="py-4 px-4 text-center bg-gray-50">Aderência</th>
-                            <th class="py-4 px-4 text-center bg-gray-50">Falta (h)</th>
+                            <th class="py-4 px-4 text-center bg-gray-50">Falta (sessões)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-800">
                         @forelse ($registros as $registro)
                             @php
-                                $aderencia = $this->aderenciaDaLinha($registro);
-                                $faixaLinha = $this->faixaDaLinha($registro);
-                                $planejadaLinha = (float) ($registro->planned_hours_num ?? 0);
-                                $faltaLinha = $planejadaLinha > 0
-                                    ? max(0, $planejadaLinha - (float) $registro->realized_hours)
-                                    : null;
+                                $aderencia      = $this->aderenciaDaLinha($registro);
+                                $faixaLinha     = $this->faixaDaLinha($registro);
+                                $planejadaLinha = $this->planejadasNoMes($registro);
+                                $faltaLinha     = $this->faltaDaLinha($registro);
 
                                 // Reaproveita as classes definidas em Index::FAIXAS, para que a cor
                                 // do badge nunca divirja da cor usada no painel de distribuição.
@@ -307,16 +313,30 @@
                                     {{ $registro->month_year ? \Carbon\Carbon::parse($registro->month_year)->translatedFormat('F \d\e Y') : '-' }}
                                 </td>
                                 <td class="py-4 px-4 text-xs">{{ $registro->requisition_number ?? '-' }}</td>
-                                <td class="py-4 px-4 text-center font-semibold">{{ $registro->requested_hours ?? 0 }}</td>
-                                <td class="py-4 px-4 text-center font-semibold">{{ $registro->approved_hours ?? 0 }}</td>
-                                <td class="py-4 px-4 text-center font-semibold">
+                                <td class="py-4 px-4 text-center font-semibold">{{ number_format($registro->requested_hours ?? 0, 0, ',', '.') }}</td>
+                                <td class="py-4 px-4 text-center font-semibold">{{ number_format($registro->approved_hours ?? 0, 0, ',', '.') }}</td>
+
+                                {{-- Planejadas: mostra o equivalente mensal (que é o que entra na
+                                     conta da falta) e, abaixo, o valor semanal como foi cadastrado. --}}
+                                <td class="py-4 px-4 text-center">
                                     @if($planejadaLinha > 0)
-                                        {{ $registro->planned_hours }}
+                                        <span class="font-semibold">{{ number_format($planejadaLinha, 0, ',', '.') }}</span>
+                                        <span class="block text-[10px] text-gray-400 font-normal">{{ rtrim(rtrim($registro->planned_hours, '0'), '.') }}/semana</span>
                                     @else
                                         <span class="text-gray-300">—</span>
                                     @endif
                                 </td>
-                                <td class="py-4 px-4 text-center font-bold text-purple-600">{{ $this->formatTime($registro->realized_hours ?? 0) }}</td>
+
+                                {{-- Realizadas: sessões como número principal; duração e contagem
+                                     de atendimentos ficam como contexto secundário. --}}
+                                <td class="py-4 px-4 text-center">
+                                    <span class="font-bold text-purple-600">{{ number_format($registro->realized_sessions ?? 0, 0, ',', '.') }}</span>
+                                    @if(($registro->realized_appointments ?? 0) > 0)
+                                        <span class="block text-[10px] text-gray-400 font-normal">
+                                            {{ $registro->realized_appointments }} atend. · {{ $this->formatTime($registro->realized_hours ?? 0) }}
+                                        </span>
+                                    @endif
+                                </td>
 
                                 {{-- Aderência --}}
                                 <td class="py-4 px-4 text-center bg-gray-50/50">
@@ -329,12 +349,12 @@
                                     @endif
                                 </td>
 
-                                {{-- Falta em horas --}}
+                                {{-- Falta em sessões --}}
                                 <td class="py-4 px-4 text-center bg-gray-50/50">
                                     @if($faltaLinha === null)
                                         <span class="text-xs text-gray-300">—</span>
                                     @elseif($faltaLinha > 0)
-                                        <span class="text-xs font-bold text-red-600 tabular-nums">{{ $this->formatTime($faltaLinha) }}</span>
+                                        <span class="text-sm font-bold text-red-600 tabular-nums">{{ number_format($faltaLinha, 0, ',', '.') }}</span>
                                     @else
                                         <span class="text-xs font-semibold text-green-600">Em dia</span>
                                     @endif

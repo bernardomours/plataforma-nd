@@ -48,15 +48,15 @@ class Index extends Component
             'ponto' => 'bg-green-500',  'badge' => 'bg-green-50 text-green-700 border-green-200',
         ],
         'atencao' => [
-            'rotulo' => 'Atenção', 'descricao' => 'entre 80% e 99%',
+            'rotulo' => 'Regular', 'descricao' => 'entre 80% e 99%',
             'ponto' => 'bg-yellow-500', 'badge' => 'bg-yellow-50 text-yellow-700 border-yellow-200',
         ],
         'critico' => [
-            'rotulo' => 'Crítico', 'descricao' => 'entre 50% e 79%',
+            'rotulo' => 'Abaixo', 'descricao' => 'entre 50% e 79%',
             'ponto' => 'bg-orange-500', 'badge' => 'bg-orange-50 text-orange-700 border-orange-200',
         ],
         'grave' => [
-            'rotulo' => 'Grave', 'descricao' => 'abaixo de 50%',
+            'rotulo' => 'Crítico', 'descricao' => 'abaixo de 50%',
             'ponto' => 'bg-red-500', 'badge' => 'bg-red-50 text-red-700 border-red-200',
         ],
     ];
@@ -77,40 +77,66 @@ class Index extends Component
     }
 
     /**
-     * Expressão SQL da carga horária planejada.
+     * Semanas consideradas por mês para converter o planejamento semanal em mensal.
      *
-     * planned_hours é varchar(255) no banco (a migration make_planned_hours_nullable
-     * trocou decimal(8,2) por string). Convertemos explicitamente para número, tratando
-     * string vazia como zero, para que SUM e divisões não dependam de coerção implícita.
+     * requested_services.planned_hours é registrado por SEMANA, enquanto requested_hours,
+     * approved_hours e o realizado são mensais. Sem esta conversão o comparativo ficava
+     * sem sentido (a aderência de abril/2026 dava 234%).
      */
-    private const SQL_PLANEJADA = 'COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0)';
-
-    /** Horas efetivamente realizadas, vindas do JOIN agregado. */
-    private const SQL_REALIZADA = 'COALESCE(ap.horas, 0)';
+    private const SEMANAS_NO_MES = 4;
 
     /**
-     * Subconsulta que soma as horas realizadas por competência.
+     * Sessões planejadas no mês.
+     *
+     * Dois ajustes embutidos:
+     *  - planned_hours é varchar(255) no banco (a migration make_planned_hours_nullable
+     *    trocou decimal(8,2) por string), então convertemos explicitamente para número
+     *    em vez de depender de coerção implícita;
+     *  - multiplicamos pelas semanas do mês, pois o campo é semanal.
+     *
+     * Apesar do nome da coluna, o valor NÃO é hora: é quantidade de sessões.
+     */
+    private const SQL_PLANEJADA = '(COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0) * ' . self::SEMANAS_NO_MES . ')';
+
+    /**
+     * Sessões efetivamente realizadas, vindas do JOIN agregado.
+     *
+     * Usamos appointments.session_number, que é o campo onde o sistema já grava a
+     * conversão de duração em sessões (40 min = 1 sessão; ABA de paciente Unimed = 60 min).
+     * Conferido contra os dados: a regra bate em 93% dos atendimentos ABA+Unimed e em 97%
+     * dos demais. Somar session_number é também o que a tela de Terapias Realizadas faz,
+     * e nas importações da Unimed o valor vem da própria planilha do convênio — ou seja,
+     * é o número que vale para faturamento. Recalcular pela duração aqui divergiria disso.
+     */
+    private const SQL_REALIZADA = 'COALESCE(ap.sessoes, 0)';
+
+    /**
+     * Subconsulta que soma as SESSÕES realizadas por competência.
      *
      * Por que agregada e não correlacionada (como era antes):
      *  - a versão anterior rodava um SELECT por linha listada;
      *  - e, principalmente, casava apenas paciente + terapia + mês, IGNORANDO o tipo de
-     *    atendimento. Como requested_services tem uma linha por tipo, o mesmo total de
-     *    horas era atribuído a todas as linhas do mesmo paciente/terapia/mês e somado
-     *    novamente em cada uma. Medido em abril/2026: o card exibia 12.777h contra
-     *    11.869h de horas efetivamente trabalhadas no mês inteiro.
+     *    atendimento. Como requested_services tem uma linha por tipo, o mesmo total era
+     *    atribuído a todas as linhas do mesmo paciente/terapia/mês e somado novamente em
+     *    cada uma — 90 grupos duplicados na base.
      *
      * Também descartamos aqui os registros que corrompem o cálculo:
-     *  - check_out nulo (atendimento sem fechamento): contaria como intervalo indefinido;
-     *  - check_out anterior ao check_in (erro de digitação): gerava horas NEGATIVAS,
-     *    subtraindo 7,67h dos totais.
+     *  - check_out nulo (atendimento sem fechamento);
+     *  - check_out anterior ao check_in (erro de digitação): 4 registros que geravam
+     *    duração negativa.
+     *
+     * A duração em horas continua sendo somada porque é exibida como informação
+     * secundária na tabela — mas quem manda no indicador é a contagem de sessões.
      */
-    private function subqueryHorasRealizadas()
+    private function subqueryRealizado()
     {
         return DB::table('appointments')
             ->selectRaw('patient_id, therapy_id, service_type_id,
                          YEAR(appointment_date) as ano,
                          MONTH(appointment_date) as mes,
-                         SUM(TIME_TO_SEC(TIMEDIFF(check_out, check_in))) / 3600 as horas')
+                         SUM(COALESCE(session_number, 0)) as sessoes,
+                         SUM(TIME_TO_SEC(TIMEDIFF(check_out, check_in))) / 3600 as horas,
+                         COUNT(*) as atendimentos')
             ->whereNotNull('check_in')
             ->whereNotNull('check_out')
             ->whereColumn('check_out', '>', 'check_in')
@@ -132,11 +158,14 @@ class Index extends Component
     {
         $query = RequestedService::query()
             ->select('requested_services.*')
-            ->selectRaw(self::SQL_REALIZADA . ' as realized_hours')
-            ->selectRaw(self::SQL_PLANEJADA . ' as planned_hours_num')
+            ->selectRaw(self::SQL_REALIZADA . ' as realized_sessions')
+            ->selectRaw(self::SQL_PLANEJADA . ' as planned_sessions')
+            // Informação secundária, só para contexto na tabela.
+            ->selectRaw('COALESCE(ap.horas, 0) as realized_hours')
+            ->selectRaw('COALESCE(ap.atendimentos, 0) as realized_appointments')
             ->with(['patient.unit', 'therapy', 'serviceType'])
             ->has('patient')
-            ->leftJoinSub($this->subqueryHorasRealizadas(), 'ap', function ($join) {
+            ->leftJoinSub($this->subqueryRealizado(), 'ap', function ($join) {
                 $join->on('ap.patient_id', '=', 'requested_services.patient_id')
                      ->on('ap.therapy_id', '=', 'requested_services.therapy_id')
                      ->on('ap.service_type_id', '=', 'requested_services.service_type_id')
@@ -218,8 +247,8 @@ class Index extends Component
      */
     private function estatisticas(): object
     {
-        $planejada = 'planned_hours_num';
-        $realizada = 'realized_hours';
+        $planejada = 'planned_sessions';
+        $realizada = 'realized_sessions';
 
         $stats = DB::query()
             ->fromSub($this->baseQuery(), 'r')
@@ -229,6 +258,8 @@ class Index extends Component
                 COALESCE(SUM(approved_hours), 0)                                      as aprovadas,
                 COALESCE(SUM({$planejada}), 0)                                        as planejadas,
                 COALESCE(SUM({$realizada}), 0)                                        as realizadas,
+                COALESCE(SUM(realized_hours), 0)                                      as horas_realizadas,
+                COALESCE(SUM(realized_appointments), 0)                               as atendimentos,
                 SUM(CASE WHEN {$planejada} > 0 THEN 1 ELSE 0 END)                     as com_plano,
                 COALESCE(SUM(CASE WHEN {$planejada} > 0 THEN {$realizada} ELSE 0 END), 0) as realizadas_com_plano,
                 COALESCE(SUM(CASE WHEN {$planejada} > 0 AND {$realizada} < {$planejada}
@@ -303,16 +334,35 @@ class Index extends Component
 
     /**
      * Aderência de uma linha, em percentual. null quando não há planejamento informado.
+     * Compara SESSÕES realizadas contra SESSÕES planejadas no mês (semanal x 4).
      */
     public function aderenciaDaLinha($registro): ?float
     {
-        $planejada = (float) ($registro->planned_hours_num ?? 0);
+        $planejada = (float) ($registro->planned_sessions ?? 0);
 
         if ($planejada <= 0) {
             return null;
         }
 
-        return round(((float) $registro->realized_hours / $planejada) * 100, 1);
+        return round(((float) $registro->realized_sessions / $planejada) * 100, 1);
+    }
+
+    /** Sessões planejadas no mês para a linha (o campo do banco é semanal). */
+    public function planejadasNoMes($registro): float
+    {
+        return (float) ($registro->planned_sessions ?? 0);
+    }
+
+    /** Sessões que faltaram. null quando não há planejamento informado. */
+    public function faltaDaLinha($registro): ?float
+    {
+        $planejada = $this->planejadasNoMes($registro);
+
+        if ($planejada <= 0) {
+            return null;
+        }
+
+        return max(0, $planejada - (float) $registro->realized_sessions);
     }
 
     public function faixaDaLinha($registro): ?string
@@ -340,14 +390,10 @@ class Index extends Component
             ->paginate(15);
 
         return view('livewire.ch-solicitada.index', [
-            'registros'             => $registros,
-            'stats'                 => $stats,
-            'faixas'                => self::FAIXAS,
-            // Mantidos com os nomes antigos para não quebrar nada que os consuma.
-            'totalHorasSolicitadas' => $stats->solicitadas,
-            'totalHorasLiberadas'   => $stats->aprovadas,
-            'totalHorasPlanejadas'  => $stats->planejadas,
-            'totalHorasRealizadas'  => $stats->realizadas,
+            'registros'      => $registros,
+            'stats'          => $stats,
+            'faixas'         => self::FAIXAS,
+            'semanasNoMes'   => self::SEMANAS_NO_MES,
         ]);
     }
 }
