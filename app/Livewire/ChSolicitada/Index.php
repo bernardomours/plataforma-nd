@@ -8,6 +8,7 @@ use Livewire\Attributes\Layout;
 use App\Models\RequestedService;
 use App\Models\Unit;
 use App\Models\Agreement;
+use App\Models\Therapy;
 use Illuminate\Support\Facades\DB;
 
 #[Layout('layouts.app')]
@@ -22,6 +23,9 @@ class Index extends Component
 
     public $agreement_id = '';
     public $agreements = [];
+
+    public $therapy_id = '';
+    public $therapies = [];
 
     /**
      * Filtro por faixa de aderência (realizada / planejada).
@@ -49,11 +53,11 @@ class Index extends Component
         ],
         'atencao' => [
             'rotulo' => 'Regular', 'descricao' => 'entre 80% e 99%',
-            'ponto' => 'bg-yellow-500', 'badge' => 'bg-yellow-50 text-yellow-700 border-yellow-200',
+            'ponto' => 'bg-blue-500', 'badge' => 'bg-blue-50 text-blue-700 border-blue-200',
         ],
         'critico' => [
             'rotulo' => 'Abaixo', 'descricao' => 'entre 50% e 79%',
-            'ponto' => 'bg-orange-500', 'badge' => 'bg-orange-50 text-orange-700 border-orange-200',
+            'ponto' => 'bg-yellow-500', 'badge' => 'bg-yellow-50 text-yellow-700 border-yellow-200',
         ],
         'grave' => [
             'rotulo' => 'Crítico', 'descricao' => 'abaixo de 50%',
@@ -66,6 +70,8 @@ class Index extends Component
         $this->units = Unit::orderBy('name')->get();
 
         $this->agreements = Agreement::orderBy('name')->get();
+
+        $this->therapies = Therapy::orderBy('name')->get();
 
         for ($i = 0; $i <= 5; $i++) {
             $year = now()->subYears($i)->year;
@@ -189,6 +195,11 @@ class Index extends Component
                     $q->where('agreement_id', $this->agreement_id);
                 });
             })
+            ->when($this->therapy_id, function ($query) {
+                // Coluna qualificada de propósito: a subconsulta 'ap' do leftJoinSub também
+                // expõe therapy_id, e sem o prefixo o MySQL acusaria coluna ambígua.
+                $query->where('requested_services.therapy_id', $this->therapy_id);
+            })
             ->when($this->year, function ($query) {
                 $query->whereYear('month_year', $this->year);
             })
@@ -298,7 +309,7 @@ class Index extends Component
 
     public function clearFilters()
     {
-        $this->reset(['unit_id', 'month', 'year', 'search', 'agreement_id', 'faixa']);
+        $this->reset(['unit_id', 'month', 'year', 'search', 'agreement_id', 'therapy_id', 'faixa']);
         $this->resetPage();
     }
 
@@ -311,6 +322,8 @@ class Index extends Component
     // $agreement_id — o Livewire monta o nome a partir da propriedade, então o método
     // nunca era chamado e trocar o convênio não voltava para a primeira página.
     public function updatedAgreementId() { $this->resetPage(); }
+
+    public function updatedTherapyId() { $this->resetPage(); }
 
     public function updatedFaixa() { $this->resetPage(); }
 
