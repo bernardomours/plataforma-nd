@@ -200,10 +200,13 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            {{-- Quebra em mais estágios: com a sidebar de 16rem, o conteúdo útil é bem
+                 menor que a viewport, então os cinco filtros só cabem lado a lado a
+                 partir de lg. Antes disso vão de 2 em 2 / 3 em 3 em vez de empilhar. --}}
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Unidade</label>
-                    <select wire:model.live="unit_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <select wire:model.live="unit_id" class="block w-full text-sm py-1.5 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Todos</option>
                         @foreach($units as $unit)
                             <option value="{{ $unit->id }}">{{ $unit->city ?? $unit->name }}</option>
@@ -212,7 +215,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Mês</label>
-                    <select wire:model.live="month" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <select wire:model.live="month" class="block w-full text-sm py-1.5 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Selecione uma opção</option>
                         <option value="1">Janeiro</option>
                         <option value="2">Fevereiro</option>
@@ -230,7 +233,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Ano</label>
-                    <select wire:model.live="year" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <select wire:model.live="year" class="block w-full text-sm py-1.5 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Selecione uma opção</option>
                         @foreach($availableYears as $ano)
                             <option value="{{ $ano }}">{{ $ano }}</option>
@@ -240,7 +243,7 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Convênio</label>
-                    <select wire:model.live="agreement_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <select wire:model.live="agreement_id" class="block w-full text-sm py-1.5 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Todos</option>
                         @foreach($agreements as $convenio)
                             <option value="{{ $convenio->id }}">{{ $convenio->name }}</option>
@@ -250,7 +253,7 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Terapia</label>
-                    <select wire:model.live="therapy_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <select wire:model.live="therapy_id" class="block w-full text-sm py-1.5 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Todas</option>
                         @foreach($therapies as $terapia)
                             <option value="{{ $terapia->id }}">{{ $terapia->name }}</option>
