@@ -35,7 +35,7 @@ class Index extends Component
     {
         $user = auth()->user();
         
-        if (!$user->hasAnyRole(['admin', 'manager', 'administrative']) && $user->hasRole('profissional')) {
+        if (!$user->hasAnyRole(['admin', 'manager', 'administrative', 'coordinator', 'supervisor']) && $user->hasRole('profissional')) {
             $this->isRestricted = true;
             if ($user->professional) {
                 $this->professional_id = $user->professional->id;
