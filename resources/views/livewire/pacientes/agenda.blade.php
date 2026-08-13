@@ -25,7 +25,7 @@
                 <h3 class="text-lg font-bold text-gray-900 uppercase">Quadro de Horários Fixos</h3>
                 <p class="text-sm text-gray-500 mt-1">Acompanhamento da agenda semanal do paciente.</p>
             </div>
-            @hasanyrole('admin|manager|administrative')
+            @hasanyrole('admin|manager|administrative|coordinator|supervisor')
                 <div>
                     <button wire:click="openModal" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition shadow-sm flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
