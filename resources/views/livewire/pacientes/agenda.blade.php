@@ -71,7 +71,7 @@
                                         <p class="text-xs text-gray-600 mt-1 truncate">{{ $schedule->professional?->name ?? 'N/A' }}</p>
                                     </div>
 
-                                    @hasanyrole('admin|manager|administrative')
+                                    @hasanyrole('admin|manager|administrative|coordinator|supervisor')
                                         <div class="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button wire:click="editSchedule({{ $schedule->id }})" class="text-orange-500 hover:text-orange-700 bg-white border border-gray-200 rounded-md p-1 shadow-sm transition-colors" title="Editar Horário">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
