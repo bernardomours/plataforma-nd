@@ -82,9 +82,18 @@ class Index extends Component
             $query->where('professional_id', $this->professional_id);
         }
 
+        // CORREÇÃO: filtra pelo convênio DO ATENDIMENTO. O fallback para o paciente cobre
+        // os registros anteriores à migration que congelou o campo no atendimento.
         if (!empty($this->agreement_id)) {
-            $query->whereHas('patient', function ($q) {
-                $q->withoutGlobalScope(SoftDeletingScope::class)->where('agreement_id', $this->agreement_id);
+            $query->where(function ($q) {
+                $q->where('appointments.agreement_id', $this->agreement_id)
+                  ->orWhere(function ($legado) {
+                      $legado->whereNull('appointments.agreement_id')
+                             ->whereHas('patient', function ($p) {
+                                 $p->withoutGlobalScope(SoftDeletingScope::class)
+                                   ->where('agreement_id', $this->agreement_id);
+                             });
+                  });
             });
         }
 
@@ -96,11 +105,19 @@ class Index extends Component
             $query->where('service_type_id', $this->service_type_id);
         }
 
+        // CORREÇÃO: filtra pela unidade DO ATENDIMENTO, com o mesmo fallback.
         if (!empty($this->unit_id)) {
-                    $query->whereHas('patient', function($q) {
-                        $q->withoutGlobalScope(SoftDeletingScope::class)->where('unit_id', $this->unit_id);
-                    });
-        }       
+            $query->where(function ($q) {
+                $q->where('appointments.unit_id', $this->unit_id)
+                  ->orWhere(function ($legado) {
+                      $legado->whereNull('appointments.unit_id')
+                             ->whereHas('patient', function ($p) {
+                                 $p->withoutGlobalScope(SoftDeletingScope::class)
+                                   ->where('unit_id', $this->unit_id);
+                             });
+                  });
+            });
+        }
 
         if (!empty($this->guide)) {
             $query->where('guide', 'like', '%' . $this->guide . '%');
@@ -523,12 +540,15 @@ class Index extends Component
                         [
                             'appointment_date' => $appointmentDate, 'check_in' => $checkIn, 'check_out' => $checkOut, 'session_number' => $sessionNumber,
                             'patient_id' => $patient->id, 'professional_id' => $professional->id, 'therapy_id' => $therapy->id, 'service_type_id' => $serviceType->id,
+                            // Congela convênio/unidade do paciente casado no momento da importação.
+                            'agreement_id' => $patient->agreement_id, 'unit_id' => $patient->unit_id,
                         ]
                     );
                 } else {
                     Appointment::create([
                         'guide' => null, 'appointment_date' => $appointmentDate, 'check_in' => $checkIn, 'check_out' => $checkOut, 'session_number' => $sessionNumber,
                         'patient_id' => $patient->id, 'professional_id' => $professional->id, 'therapy_id' => $therapy->id, 'service_type_id' => $serviceType->id,
+                        'agreement_id' => $patient->agreement_id, 'unit_id' => $patient->unit_id,
                     ]);
                 }
                 $importados++;

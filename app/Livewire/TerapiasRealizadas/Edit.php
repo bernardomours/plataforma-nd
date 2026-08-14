@@ -9,7 +9,10 @@ use App\Models\Patient;
 use App\Models\Therapy;
 use App\Models\ServiceType;
 use App\Models\Professional;
+use App\Models\Agreement;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Validation\Rule;
 
 #[Layout('layouts.app')]
 class Edit extends Component
@@ -26,6 +29,12 @@ class Edit extends Component
     public $check_in;
     public $check_out;
     public $session_number;
+
+    /** Convênio e unidade DO ATENDIMENTO (ver Create.php e a migration correspondente). */
+    public $agreement_id = '';
+    public $unit_id = '';
+
+    public $showFaturamentoModal = false;
 
     public function mount($id)
     {
@@ -49,6 +58,71 @@ class Edit extends Component
         $this->check_in = $appointment->check_in ? \Carbon\Carbon::parse($appointment->check_in)->format('H:i') : null;
         $this->check_out = $appointment->check_out ? \Carbon\Carbon::parse($appointment->check_out)->format('H:i') : null;
         $this->session_number = $appointment->session_number;
+
+        // Atendimentos anteriores à migration podem estar sem os campos; nesse caso
+        // caímos no cadastro atual do paciente, que é o que os relatórios já usavam.
+        $this->agreement_id = $appointment->agreement_id ?: '';
+        $this->unit_id = $appointment->unit_id ?: '';
+
+        if (! $this->agreement_id || ! $this->unit_id) {
+            $this->aplicarPadraoDoPaciente();
+        }
+    }
+
+    /**
+     * SEGURANÇA: sobrescrever convênio/unidade altera dado de faturamento — mesmos papéis
+     * que já podem lançar atendimento e editar o cadastro do paciente.
+     */
+    public function podeAlterarFaturamento(): bool
+    {
+        return auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']);
+    }
+
+    public function abrirFaturamentoModal()
+    {
+        if (! $this->podeAlterarFaturamento()) {
+            abort(403, 'Você não tem permissão para alterar convênio ou unidade do atendimento.');
+        }
+
+        $this->showFaturamentoModal = true;
+    }
+
+    public function fecharFaturamentoModal()
+    {
+        $this->showFaturamentoModal = false;
+    }
+
+    public function restaurarPadraoPaciente()
+    {
+        $this->aplicarPadraoDoPaciente();
+        $this->calculateSessions();
+        $this->showFaturamentoModal = false;
+    }
+
+    private function aplicarPadraoDoPaciente(): void
+    {
+        if (empty($this->patient_id)) {
+            return;
+        }
+
+        $patient = Patient::withoutGlobalScope(SoftDeletingScope::class)
+            ->select('id', 'agreement_id', 'unit_id')
+            ->find($this->patient_id);
+
+        $this->agreement_id = $patient->agreement_id ?? '';
+        $this->unit_id = $patient->unit_id ?? '';
+    }
+
+    /**
+     * SEGURANÇA (multi-tenant): a unidade gravada tem de estar entre as permitidas.
+     */
+    private function unidadesPermitidasIds(): array
+    {
+        $allowed = auth()->user()->getAllowedUnitIds();
+
+        return $allowed === null
+            ? Unit::pluck('id')->all()
+            : array_map('intval', $allowed);
     }
 
     /**
@@ -77,6 +151,9 @@ class Edit extends Component
             'check_in' => 'required|date_format:H:i',
             'check_out' => 'required|date_format:H:i|after:check_in',
             'session_number' => 'required|integer|min:0',
+            // Congelados no atendimento; alterados apenas pelo modal.
+            'agreement_id' => 'required|exists:agreements,id',
+            'unit_id' => ['required', Rule::in($this->unidadesPermitidasIds())],
         ];
     }
 
@@ -102,7 +179,13 @@ class Edit extends Component
         $this->calculateSessions();
     }
 
-    public function updatedPatientId() { $this->calculateSessions(); }
+    public function updatedPatientId()
+    {
+        $this->aplicarPadraoDoPaciente();
+        $this->calculateSessions();
+    }
+
+    public function updatedAgreementId() { $this->calculateSessions(); }
     public function updatedCheckIn() { $this->calculateSessions(); }
     public function updatedCheckOut() { $this->calculateSessions(); }
 
@@ -115,13 +198,13 @@ class Edit extends Component
 
         $sessionDuration = 40;
 
-        if (!empty($this->patient_id) && !empty($this->therapy_id)) {
-            // SEGURANÇA: mantém IsolatesByUnit, ignora só o soft delete.
-            $patient = Patient::withoutGlobalScope(SoftDeletingScope::class)->with('agreement')->find($this->patient_id);
+        // A duração da sessão vem do convênio DO ATENDIMENTO, não do cadastro do paciente.
+        if (!empty($this->agreement_id) && !empty($this->therapy_id)) {
+            $agreement = Agreement::find($this->agreement_id);
             $therapy = Therapy::find($this->therapy_id);
 
-            if ($patient && $therapy) {
-                $isHumana = $patient->agreement && $patient->agreement->name === 'Humana';
+            if ($agreement && $therapy) {
+                $isHumana = $agreement->name === 'Humana';
                 $isAba = $therapy->name === 'ABA';
 
                 $sessionDuration = $isHumana ? 40 : ($isAba ? 60 : 40);
@@ -160,6 +243,8 @@ class Edit extends Component
             'check_in' => $this->check_in,
             'check_out' => $this->check_out,
             'session_number' => $this->session_number,
+            'agreement_id' => $this->agreement_id,
+            'unit_id' => $this->unit_id,
         ]);
 
         session()->flash('message', 'Consulta atualizada com sucesso!');
@@ -199,6 +284,8 @@ class Edit extends Component
             'therapies' => Therapy::orderBy('name')->get(),
             'serviceTypes' => ServiceType::orderBy('name')->get(),
             'professionals' => $professionalsQuery->get(),
+            'agreements' => Agreement::orderBy('name')->get(),
+            'units' => Unit::whereIn('id', $this->unidadesPermitidasIds())->orderBy('name')->get(),
         ]);
     }
 }

@@ -127,14 +127,30 @@ class Index extends Component
         $sistemaData = [];
 
         // --- 2.1 Busca Terapias Normais (Appointments) ---
+        // CORREÇÃO: o convênio e a unidade agora vêm do PRÓPRIO atendimento, não do
+        // cadastro atual do paciente. Antes, um atendimento feito como particular (ou
+        // realizado em outra unidade) entrava na conferência da Humana só porque o
+        // paciente está cadastrado nela hoje — e o inverso também: atendimentos feitos
+        // pela Humana sumiam da auditoria assim que o paciente trocava de convênio.
+        // COALESCE cobre registros anteriores à migration, caindo no dado do paciente.
         $queryAppointments = Appointment::with(['patient', 'therapy'])
             ->whereYear('appointment_date', $this->ano)
             ->whereMonth('appointment_date', $this->mes)
-            ->whereHas('patient', function ($q) {
-                $q->where('agreement_id', 1);
-                if ($this->unidade_relatorio) {
-                    $q->where('unit_id', $this->unidade_relatorio);
-                }
+            ->where(function ($q) {
+                $q->where('appointments.agreement_id', 1)
+                  ->orWhere(function ($sub) {
+                      $sub->whereNull('appointments.agreement_id')
+                          ->whereHas('patient', fn ($p) => $p->where('agreement_id', 1));
+                  });
+            })
+            ->when($this->unidade_relatorio, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('appointments.unit_id', $this->unidade_relatorio)
+                        ->orWhere(function ($legado) {
+                            $legado->whereNull('appointments.unit_id')
+                                   ->whereHas('patient', fn ($p) => $p->where('unit_id', $this->unidade_relatorio));
+                        });
+                });
             });
 
         $systemAppointments = $queryAppointments->get();

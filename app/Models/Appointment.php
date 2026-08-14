@@ -32,6 +32,11 @@ class Appointment extends Model
         'professional_id',
         'therapy_id',
         'service_type_id',
+        // Congelados no momento do lançamento (ver migration add_agreement_and_unit_to_appointments).
+        // O padrão vem do cadastro do paciente, mas podem ser sobrescritos quando o
+        // atendimento ocorre fora do convênio/unidade habituais.
+        'agreement_id',
+        'unit_id',
     ];
 
     /**
@@ -65,6 +70,12 @@ class Appointment extends Model
         return $this->belongsTo(Patient::class)->withTrashed();
     }
 
+    /** Convênio sob o qual ESTE atendimento foi realizado (não o atual do paciente). */
+    public function agreement(): BelongsTo
+    {
+        return $this->belongsTo(Agreement::class);
+    }
+
     public function professional(): BelongsTo
     {
         return $this->belongsTo(Professional::class)->withTrashed();
@@ -75,6 +86,13 @@ class Appointment extends Model
         return $this->belongsTo(Therapy::class);
     }
 
+    /**
+     * Unidade em que ESTE atendimento ocorreu (não a atual do paciente).
+     *
+     * Esta relação já existia no model, mas apontava para appointments.unit_id — coluna
+     * que não existia no banco até a migration add_agreement_and_unit_to_appointments.
+     * Era código morto: qualquer uso resultaria em "Unknown column". Agora é válida.
+     */
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
