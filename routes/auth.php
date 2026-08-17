@@ -28,4 +28,7 @@ Route::middleware('auth')->group(function () {
 
     Volt::route('confirm-password', 'pages.auth.confirm-password')
         ->name('password.confirm');
+        
+    Volt::route('trocar-senha', 'pages.auth.change-password')
+        ->name('password.change');
 });

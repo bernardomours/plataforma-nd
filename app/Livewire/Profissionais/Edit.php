@@ -160,6 +160,8 @@ class Edit extends Component
                     [
                         'name' => $this->name,
                         'password' => Hash::make('mudar123'),
+                        // Ver comentário equivalente em Profissionais/Create.php.
+                        'must_change_password' => true,
                         'birth_date' => $this->birth_date,
                         'unit_id' => $this->selectedUnits[0] ?? null,
                     ]

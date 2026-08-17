@@ -27,6 +27,9 @@ class User extends Authenticatable
         'birth_date',
         'role',
         'can_access_production',
+        // Marca contas que ainda estão com a senha padrão e precisam trocá-la no
+        // primeiro acesso (middleware EnsurePasswordIsChanged).
+        'must_change_password',
     ];
 
     /**
@@ -50,6 +53,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'birth_date' => 'date',
+            'must_change_password' => 'boolean',
         ];
     }
 

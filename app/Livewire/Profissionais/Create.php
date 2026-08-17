@@ -87,6 +87,10 @@ class Create extends Component
                 [
                     'name' => $this->name,
                     'password' => Hash::make('mudar123'),
+                    // Obriga a definir uma senha pessoal no primeiro acesso (middleware
+                    // EnsurePasswordIsChanged). Sem isto a conta ficaria indefinidamente
+                    // acessível com a senha padrão, que é pública e previsível.
+                    'must_change_password' => true,
                     'birth_date' => $this->birth_date,
                     'unit_id' => $this->selectedUnits[0] ?? null,
                 ]
