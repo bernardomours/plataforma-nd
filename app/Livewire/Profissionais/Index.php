@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use App\Models\Professional;
 use App\Models\Unit;
 use App\Models\Therapy;
+use App\Models\User;
 use App\Enums\ProfessionalRole;
 use Livewire\Attributes\Layout;
 
@@ -102,20 +103,103 @@ class Index extends Component
 
         $profissionais = Professional::whereIn('id', $this->selectedProfessionals)->get();
 
+        $acessosRevogados = 0;
+        $acessosMantidos = [];
+
         foreach ($profissionais as $record) {
             $record->movementHistories()->create([
-                'action' => 'Saída', 
+                'action' => 'Saída',
                 'reason' => $motivoCompleto,
                 'date' => now(),
                 'user_id' => auth()->id(),
             ]);
             $record->delete(); // Soft Delete
+
+            // SEGURANÇA: inativar o profissional precisa revogar também o acesso ao sistema.
+            // Antes, o User criado junto com o cadastro continuava ativo, então alguém já
+            // desligado seguia conseguindo entrar — e ainda aparecia no e-mail de
+            // aniversariantes, porque o whereDoesntHave('professional') passa a considerar
+            // que o usuário não tem profissional quando este está na lixeira.
+            $resultado = $this->revogarAcessoDoUsuario($record);
+
+            if ($resultado === 'revogado') {
+                $acessosRevogados++;
+            } elseif ($resultado !== null) {
+                $acessosMantidos[] = "{$record->name}: {$resultado}";
+            }
+        }
+
+        if ($acessosMantidos) {
+            session()->flash('warning', 'Atenção — acesso NÃO revogado para: ' . implode(' | ', $acessosMantidos));
         }
 
         $this->closeSaidaModal();
         $this->selectedProfessionals = [];
         $this->selectAll = false;
-        session()->flash('message', count($profissionais) . ' profissional(is) inativado(s) com sucesso.');
+
+        $msg = count($profissionais) . ' profissional(is) inativado(s) com sucesso.';
+        if ($acessosRevogados > 0) {
+            $msg .= " Acesso ao sistema revogado para {$acessosRevogados} conta(s).";
+        }
+        session()->flash('message', $msg);
+    }
+
+    /**
+     * Desativa a conta de sistema vinculada ao profissional.
+     *
+     * O soft delete do User é o que efetivamente bloqueia o login: o provider de
+     * autenticação do Laravel consulta o model, o SoftDeletingScope entra na query e a
+     * conta deixa de ser encontrada — inclusive em sessões já abertas, que são revalidadas
+     * a cada request.
+     *
+     * @return string|null  'revogado' em caso de sucesso, o motivo quando não foi possível,
+     *                      ou null quando o profissional não tem conta vinculada.
+     */
+    private function revogarAcessoDoUsuario(Professional $record): ?string
+    {
+        if (! $record->user_id) {
+            return null;
+        }
+
+        // Evita o auto-bloqueio: quem está executando a inativação não perde o próprio
+        // acesso no meio da operação.
+        if ((int) $record->user_id === (int) auth()->id()) {
+            return 'é a sua própria conta — revogue por Usuários';
+        }
+
+        // A conta pode ser COMPARTILHADA: o cadastro de profissional usa
+        // User::firstOrCreate(['email' => ...]), então dois profissionais com o mesmo
+        // e-mail apontam para o mesmo usuário. Sem esta checagem, inativar um derrubaria
+        // o acesso do outro, que continua trabalhando.
+        $outroAtivo = Professional::where('user_id', $record->user_id)
+            ->whereKeyNot($record->id)
+            ->exists(); // o global scope de SoftDeletes já limita aos ativos
+
+        if ($outroAtivo) {
+            return 'conta compartilhada com outro profissional ativo';
+        }
+
+        $user = User::find($record->user_id);
+
+        if (! $user) {
+            return null;
+        }
+
+        // AUDITORIA: registra a revogação antes de apagar, com o motivo da saída.
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->event('deleted')
+            ->withProperties(['attributes' => [
+                'acao'          => 'Acesso revogado por inativação do profissional',
+                'profissional'  => $record->name,
+                'email'         => $user->email,
+            ]])
+            ->log('Acesso ao sistema revogado por inativação do profissional');
+
+        $user->delete();
+
+        return 'revogado';
     }
 
     public function openRetornoModal($id)
@@ -149,8 +233,33 @@ class Index extends Component
 
         $record->restore(); // Retira do Soft Delete
 
+        // Contrapartida da revogação feita na saída: devolve o acesso ao sistema.
+        // withTrashed() é necessário — a conta está justamente na lixeira.
+        $acessoDevolvido = false;
+
+        if ($record->user_id) {
+            $user = User::withTrashed()->find($record->user_id);
+
+            if ($user && $user->trashed()) {
+                activity()
+                    ->causedBy(auth()->user())
+                    ->performedOn($user)
+                    ->event('restored')
+                    ->withProperties(['attributes' => [
+                        'acao'         => 'Acesso restaurado por retorno do profissional',
+                        'profissional' => $record->name,
+                        'motivo'       => $this->motivo_retorno,
+                    ]])
+                    ->log('Acesso ao sistema restaurado por retorno do profissional');
+
+                $user->restore();
+                $acessoDevolvido = true;
+            }
+        }
+
         $this->closeRetornoModal();
-        session()->flash('message', 'Profissional reativado com sucesso.');
+        session()->flash('message', 'Profissional reativado com sucesso.'
+            . ($acessoDevolvido ? ' Acesso ao sistema restaurado.' : ''));
     }
 
     // ==========================================

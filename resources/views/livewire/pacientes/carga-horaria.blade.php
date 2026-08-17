@@ -172,7 +172,6 @@
                             </div>
                         </div>
 
-                        <!-- INÍCIO DO REPEATER -->
                         <div class="space-y-4">
                             <h4 class="text-sm font-semibold text-gray-700 border-b pb-2 mb-4">Terapias Solicitadas</h4>
                             
@@ -228,7 +227,6 @@
                             @endforeach
                         </div>
 
-                        <!-- BOTÃO DE ADICIONAR NOVO (Esconde se estiver editando) -->
                         @if(!$editingRecordId)
                             <button type="button" wire:click="adicionarTerapia" class="mt-4 flex items-center text-sm text-blue-600 font-semibold hover:text-blue-800 focus:outline-none">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -242,8 +240,6 @@
                             Cancelar
                         </button>
                         
-                        <!-- O botão 'Salvar e Criar Novo' foi removido, pois o Repeater já atende esse propósito de forma mais inteligente. -->
-
                         <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             Salvar
                         </button>

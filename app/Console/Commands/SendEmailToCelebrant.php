@@ -34,8 +34,13 @@ class SendEmailToCelebrant extends Command
         try {
             $hoje = Carbon::today();
 
+            // CORREÇÃO: 'professional' aponta para um model com SoftDeletes, então o
+            // whereDoesntHave padrão ignora profissionais inativados — o desligado voltava
+            // a aparecer aqui rotulado como "Usuário(s)". O withTrashed() considera também
+            // os inativos, de modo que só entram nesta lista os usuários que nunca foram
+            // profissionais (administrativo, gestão, etc.).
             $users = User::with('units')
-                              ->whereDoesntHave('professional')
+                              ->whereDoesntHave('professional', fn ($q) => $q->withTrashed())
                               ->whereMonth('birth_date', $hoje->month)
                               ->whereDay('birth_date', $hoje->day)
                               ->get()
