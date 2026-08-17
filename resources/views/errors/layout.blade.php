@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('titulo') · Plataforma ND</title>
-    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" href="{{ asset('images/logo-site.png') }}" type="image/png">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
 
@@ -126,7 +126,7 @@
             </div>
         </div>
 
-        <p class="rodape">Núcleo Desenvolve</p>
+        <p class="rodape">Contate o responsável do sistema.</p>
     </div>
 </body>
 </html>
