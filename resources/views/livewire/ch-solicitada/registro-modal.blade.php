@@ -53,7 +53,7 @@
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Mês/Ano <span class="text-red-500">*</span></label>
-                            <input type="month" wire:model="month_year" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <input type="month" wire:model.live="month_year" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                             @error('month_year') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
                         </div>
                         
@@ -88,7 +88,7 @@
                                 <div class="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Terapia <span class="text-red-500">*</span></label>
-                                        <select wire:model="terapias.{{ $index }}.therapy_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <select wire:model.live="terapias.{{ $index }}.therapy_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                             <option value="">Selecione a Terapia</option>
                                             @foreach($therapies as $therapy)
                                                 <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
@@ -99,7 +99,7 @@
 
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">Tipo de Atendimento <span class="text-red-500">*</span></label>
-                                        <select wire:model="terapias.{{ $index }}.service_type_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <select wire:model.live="terapias.{{ $index }}.service_type_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                             <option value="">Selecione o Tipo</option>
                                             @foreach($serviceTypes as $type)
                                                 <option value="{{ $type->id }}">{{ $type->name }}</option>
@@ -119,9 +119,41 @@
                                         <label class="block text-sm font-medium text-gray-700">CH Liberada</label>
                                         <input type="number" step="0.01" wire:model="terapias.{{ $index }}.approved_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white">
                                     </div>
+                                    {{-- CH Planejada: total de sessões do MÊS, derivado da agenda do
+                                         paciente (blocos da grade × ocorrências do dia da semana no
+                                         mês, descontando feriados) e editável para exceções. --}}
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700">CH Planejada</label>
-                                        <input type="number" step="0.01" wire:model="terapias.{{ $index }}.planned_hours" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white">
+                                        <input type="number" step="1" min="0" placeholder="sessões no mês"
+                                               wire:model.live="terapias.{{ $index }}.planned_sessions"
+                                               class="mt-1 block w-full rounded-md border-gray-300 bg-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+
+                                        @php
+                                            $linha = $terapias[$index];
+                                            // Detalhamento vai para o tooltip: numa coluna de 1/3 a lista completa
+                                            // dos blocos quebrava em varias linhas e apertava o formulario inteiro.
+                                            $detalhe = collect($linha['agenda_blocos'] ?? [])
+                                                ->map(fn ($b) => ucfirst($b['dia']) . " {$b['inicio']}-{$b['fim']}: {$b['sessoes']} x {$b['ocorrencias']}")
+                                                ->implode(PHP_EOL);
+                                        @endphp
+
+                                        @if($linha['planned_from_schedule'] ?? false)
+                                            <p class="mt-1 flex items-center gap-1 text-[11px] text-green-700" title="{{ $detalhe }}">
+                                                <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                Agenda · <strong>{{ $linha['planned_hours'] }}/sem</strong>
+                                            </p>
+                                        @elseif(!empty($linha['planned_sessions']))
+                                            <p class="mt-1 text-[11px] text-amber-700">
+                                                Manual
+                                                @if(!empty($linha['agenda_mensal']))
+                                                    <span class="text-gray-400">(agenda: {{ $linha['agenda_mensal'] }})</span>
+                                                @endif
+                                            </p>
+                                        @elseif(!$temAgenda)
+                                            <p class="mt-1 text-[11px] text-amber-700">Sem agenda cadastrada</p>
+                                        @elseif(!empty($linha['therapy_id']) && !empty($linha['service_type_id']))
+                                            <p class="mt-1 text-[11px] text-amber-700">Não está na agenda</p>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

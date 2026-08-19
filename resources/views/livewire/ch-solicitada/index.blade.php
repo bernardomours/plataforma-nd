@@ -298,7 +298,17 @@
                             <th class="py-4 px-4">Requisição</th>
                             <th class="py-4 px-4 text-center">Sessões Solicitadas</th>
                             <th class="py-4 px-4 text-center">Sessões Liberadas</th>
-                            <th class="py-4 px-4 text-center">Planejadas / mês</th>
+                            <th class="py-4 px-4 text-center">
+                                <span class="inline-flex items-center gap-1">
+                                    Planejadas / mês
+                                    <svg class="h-3.5 w-3.5 shrink-0 cursor-help text-gray-400 hover:text-blue-600"
+                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                                         role="img" aria-label="A Carga Horária Planejada é calculada a partir da agenda do paciente.">
+                                        <title>A Carga Horária Planejada é calculada a partir da agenda do paciente.</title>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </span>
+                            </th>
                             <th class="py-4 px-4 text-center">Realizadas</th>
                             <th class="py-4 px-4 text-center bg-gray-50">Aderência</th>
                             <th class="py-4 px-4 text-center bg-gray-50">Falta (sessões)</th>

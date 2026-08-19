@@ -6,6 +6,7 @@ use App\Models\Patient;
 use App\Models\RequestedService;
 use App\Models\Therapy;
 use App\Models\ServiceType;
+use App\Services\PlannedSessionsFromSchedule;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Carbon\Carbon;
@@ -17,6 +18,9 @@ class CargaHoraria extends Component
     public Patient $patient;
 
     public $filter_month_year = '';
+
+    /** O paciente tem agenda cadastrada? Controla o aviso no modal. */
+    public $temAgenda = false;
 
     public $isModalOpen = false;
     public $editingRecordId = null;
@@ -39,6 +43,8 @@ class CargaHoraria extends Component
             'terapias.*.requested_hours' => 'required|numeric|min:0',
             'terapias.*.approved_hours' => 'nullable|numeric|min:0',
             'terapias.*.planned_hours' => 'nullable|numeric|min:0',
+            // Total de sessoes do MES, derivado da agenda mas editavel.
+            'terapias.*.planned_sessions' => 'nullable|integer|min:0',
         ];
     }
     
@@ -51,6 +57,8 @@ class CargaHoraria extends Component
     public function mount(Patient $patient)
     {
         $this->patient = $patient;
+
+        $this->temAgenda = app(PlannedSessionsFromSchedule::class)->pacienteTemAgenda($patient);
     }
 
     public function clearFilter()
@@ -93,7 +101,10 @@ class CargaHoraria extends Component
             'service_type_id' => '',
             'requested_hours' => '',
             'approved_hours' => '',
-            'planned_hours' => '',
+            'planned_hours' => '',          // sessoes por SEMANA (contexto)
+            'planned_sessions' => '',       // sessoes no MES (e o que vale no calculo)
+            'planned_from_schedule' => false,
+            'agenda_blocos' => [],
         ];
     }
 
@@ -121,7 +132,15 @@ class CargaHoraria extends Component
             'requested_hours' => $record->requested_hours,
             'approved_hours' => $record->approved_hours,
             'planned_hours' => $record->planned_hours,
+            'planned_sessions' => $record->planned_sessions,
+            'planned_from_schedule' => (bool) $record->planned_from_schedule,
+            'agenda_blocos' => [],
         ];
+
+        // CONGELAMENTO: na edicao carregamos o valor JA GRAVADO, nao o que a agenda diz
+        // hoje. Se a grade mudou depois, o numero do mes fechado permanece o de entao;
+        // os blocos servem apenas para a tela poder mostrar a divergencia.
+        $this->carregarBlocosDaAgenda(0);
 
         $this->isModalOpen = true;
     }
@@ -144,6 +163,8 @@ class CargaHoraria extends Component
                 'requested_hours' => $dadosEdicao['requested_hours'],
                 'approved_hours' => $dadosEdicao['approved_hours'] ?: null,
                 'planned_hours' => $dadosEdicao['planned_hours'] ?: null,
+                'planned_sessions' => $dadosEdicao['planned_sessions'] !== '' ? (int) $dadosEdicao['planned_sessions'] : null,
+                'planned_from_schedule' => (bool) ($dadosEdicao['planned_from_schedule'] ?? false),
             ]);
             
             session()->flash('message', 'Solicitação atualizada com sucesso!');
@@ -159,6 +180,9 @@ class CargaHoraria extends Component
                     'requested_hours' => $terapia['requested_hours'],
                     'approved_hours' => $terapia['approved_hours'] ?: null,
                     'planned_hours' => $terapia['planned_hours'] ?: null,
+                    // Congelado no salvamento (ver RegistroModal e a migration).
+                    'planned_sessions' => $terapia['planned_sessions'] !== '' ? (int) $terapia['planned_sessions'] : null,
+                    'planned_from_schedule' => (bool) ($terapia['planned_from_schedule'] ?? false),
                 ]);
             }
             
@@ -170,6 +194,91 @@ class CargaHoraria extends Component
     {
         $this->processSave(); 
         $this->closeModal();  
+    }
+
+    /**
+     * Recalcula o planejado quando a linha ganha terapia + tipo, ou quando o mes muda.
+     * Mesmo comportamento do modal de ChSolicitada, para as duas telas nao divergirem.
+     */
+    public function updated($property)
+    {
+        if (str_starts_with($property, 'terapias.')) {
+            $partes = explode('.', $property);
+            $indice = (int) ($partes[1] ?? -1);
+            $campo  = $partes[2] ?? '';
+
+            if (in_array($campo, ['therapy_id', 'service_type_id'], true)) {
+                $this->preencherPelaAgenda($indice);
+            }
+
+            // Digitar o total a mao desmarca a origem "agenda".
+            if ($campo === 'planned_sessions' && isset($this->terapias[$indice])) {
+                $this->terapias[$indice]['planned_from_schedule'] = false;
+            }
+
+            return;
+        }
+
+        if ($property === 'month_year') {
+            foreach (array_keys($this->terapias) as $i) {
+                $this->preencherPelaAgenda($i);
+            }
+        }
+    }
+
+    /**
+     * Pre-preenche a linha com o que a agenda indica para a competencia escolhida.
+     * Nao mexe em nada quando a combinacao terapia+tipo nao existe na agenda: o campo
+     * segue manual e a tela avisa.
+     */
+    private function preencherPelaAgenda(int $indice): void
+    {
+        $derivado = $this->derivarDaAgenda($indice);
+
+        if ($derivado === null) {
+            if (isset($this->terapias[$indice])) {
+                $this->terapias[$indice]['planned_from_schedule'] = false;
+                $this->terapias[$indice]['agenda_blocos'] = [];
+            }
+
+            return;
+        }
+
+        $this->terapias[$indice]['planned_sessions'] = $derivado['mensal'];
+        $this->terapias[$indice]['planned_hours'] = $derivado['semanal'];
+        $this->terapias[$indice]['planned_from_schedule'] = true;
+        $this->terapias[$indice]['agenda_blocos'] = $derivado['blocos'];
+    }
+
+    /** Carrega apenas os blocos, sem sobrescrever o valor gravado (usado na edicao). */
+    private function carregarBlocosDaAgenda(int $indice): void
+    {
+        $derivado = $this->derivarDaAgenda($indice);
+
+        if ($derivado !== null) {
+            $this->terapias[$indice]['agenda_blocos'] = $derivado['blocos'];
+            $this->terapias[$indice]['agenda_mensal'] = $derivado['mensal'];
+        }
+    }
+
+    private function derivarDaAgenda(int $indice): ?array
+    {
+        $linha = $this->terapias[$indice] ?? null;
+
+        if (! $linha || empty($this->month_year)) {
+            return null;
+        }
+
+        if (empty($linha['therapy_id']) || empty($linha['service_type_id'])) {
+            return null;
+        }
+
+        return app(PlannedSessionsFromSchedule::class)->paraCombinacao(
+            $this->patient,
+            $linha['therapy_id'],
+            $linha['service_type_id'],
+            Carbon::parse($this->month_year . '-01')
+        );
     }
 
     
@@ -197,7 +306,8 @@ class CargaHoraria extends Component
         $totals = [
             'requested' => $records->sum('requested_hours'),
             'approved' => $records->sum('approved_hours'),
-            'planned' => $records->sum('planned_hours'),
+            // Soma o total MENSAL congelado; planned_hours guarda apenas o semanal.
+            'planned' => $records->sum('planned_sessions'),
         ];
 
         return view('livewire.pacientes.carga-horaria', [

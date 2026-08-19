@@ -2,8 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,41 +14,35 @@ return new class extends Migration
      * cadastrado consegue entrar. Esta coluna, somada ao middleware
      * EnsurePasswordIsChanged, obriga a definição de uma senha nova no primeiro acesso.
      *
-     * O backfill identifica as contas afetadas testando o hash — assim só é marcado quem
-     * de fato ainda está com 'mudar123'. Quem já trocou não é incomodado.
+     * ESTA MIGRATION É PROPOSITALMENTE RÁPIDA E IDEMPOTENTE.
+     *
+     * A identificação de quem ainda usa 'mudar123' exige um Hash::check por conta, e
+     * bcrypt é lento por construção — em produção isso levava minutos e parecia travado.
+     * Como o MySQL faz commit implícito no ALTER TABLE (DDL não tem rollback), interromper
+     * o comando deixava a coluna criada mas SEM o registro na tabela `migrations`, e a
+     * execução seguinte falhava com "Duplicate column name".
+     *
+     * Por isso: aqui só a coluna, protegida por hasColumn. O backfill virou o comando
+     * `php artisan usuarios:marcar-senha-padrao`, que pode ser interrompido e repetido
+     * sem consequência.
      */
     public function up(): void
     {
+        if (Schema::hasColumn('users', 'must_change_password')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('must_change_password')->default(false)->after('password');
         });
-
-        // Hash::check é uma operação cara por natureza (bcrypt). Com algumas centenas de
-        // usuários a varredura leva alguns segundos — é execução única, na migration.
-        $marcados = 0;
-
-        DB::table('users')->select('id', 'password')->orderBy('id')->chunk(200, function ($usuarios) use (&$marcados) {
-            $ids = [];
-
-            foreach ($usuarios as $usuario) {
-                if ($usuario->password && Hash::check('mudar123', $usuario->password)) {
-                    $ids[] = $usuario->id;
-                }
-            }
-
-            if ($ids) {
-                DB::table('users')->whereIn('id', $ids)->update(['must_change_password' => true]);
-                $marcados += count($ids);
-            }
-        });
-
-        if ($marcados > 0) {
-            echo "  -> {$marcados} conta(s) ainda com a senha padrão foram marcadas para troca obrigatória.\n";
-        }
     }
 
     public function down(): void
     {
+        if (! Schema::hasColumn('users', 'must_change_password')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn('must_change_password');
         });

@@ -85,9 +85,9 @@ class Index extends Component
     /**
      * Semanas consideradas por mês para converter o planejamento semanal em mensal.
      *
-     * requested_services.planned_hours é registrado por SEMANA, enquanto requested_hours,
-     * approved_hours e o realizado são mensais. Sem esta conversão o comparativo ficava
-     * sem sentido (a aderência de abril/2026 dava 234%).
+     * Usado apenas como RESERVA, para os registros antigos que só têm o valor semanal.
+     * A partir da derivação pela agenda, o mensal é apurado com precisão (quantas segundas,
+     * terças etc. o mês tem, descontados feriados) e gravado em planned_sessions.
      */
     private const SEMANAS_NO_MES = 4;
 
@@ -102,7 +102,13 @@ class Index extends Component
      *
      * Apesar do nome da coluna, o valor NÃO é hora: é quantidade de sessões.
      */
-    private const SQL_PLANEJADA = '(COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0) * ' . self::SEMANAS_NO_MES . ')';
+    private const SQL_PLANEJADA = '(COALESCE(
+        requested_services.planned_sessions,
+        COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0) * ' . self::SEMANAS_NO_MES . '
+    ))';
+
+    /** Valor SEMANAL, exibido como contexto embaixo do total mensal. */
+    private const SQL_PLANEJADA_SEMANAL = 'COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0)';
 
     /**
      * Sessões efetivamente realizadas, vindas do JOIN agregado.
@@ -165,7 +171,10 @@ class Index extends Component
         $query = RequestedService::query()
             ->select('requested_services.*')
             ->selectRaw(self::SQL_REALIZADA . ' as realized_sessions')
-            ->selectRaw(self::SQL_PLANEJADA . ' as planned_sessions')
+            // Alias distinto da coluna física planned_sessions: com 'requested_services.*'
+            // no select, repetir o nome quebra a subconsulta com "Duplicate column name".
+            ->selectRaw(self::SQL_PLANEJADA . ' as planned_total')
+            ->selectRaw(self::SQL_PLANEJADA_SEMANAL . ' as planned_weekly')
             // Informação secundária, só para contexto na tabela.
             ->selectRaw('COALESCE(ap.horas, 0) as realized_hours')
             ->selectRaw('COALESCE(ap.atendimentos, 0) as realized_appointments')
@@ -258,7 +267,7 @@ class Index extends Component
      */
     private function estatisticas(): object
     {
-        $planejada = 'planned_sessions';
+        $planejada = 'planned_total';
         $realizada = 'realized_sessions';
 
         $stats = DB::query()
@@ -351,7 +360,7 @@ class Index extends Component
      */
     public function aderenciaDaLinha($registro): ?float
     {
-        $planejada = (float) ($registro->planned_sessions ?? 0);
+        $planejada = (float) ($registro->planned_total ?? 0);
 
         if ($planejada <= 0) {
             return null;
@@ -363,7 +372,7 @@ class Index extends Component
     /** Sessões planejadas no mês para a linha (o campo do banco é semanal). */
     public function planejadasNoMes($registro): float
     {
-        return (float) ($registro->planned_sessions ?? 0);
+        return (float) ($registro->planned_total ?? 0);
     }
 
     /** Sessões que faltaram. null quando não há planejamento informado. */

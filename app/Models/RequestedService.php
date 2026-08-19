@@ -15,7 +15,12 @@ class RequestedService extends Model
         'requisition_number',
         'requested_hours',
         'approved_hours',
+        // Semanal (legado, mantido como contexto "x/semana" na tela).
         'planned_hours',
+        // Total do MÊS, congelado no momento em que a CH é salva. É o valor que o
+        // painel de faltas usa; não muda sozinho se a agenda for alterada depois.
+        'planned_sessions',
+        'planned_from_schedule',
         'patient_id',
         'therapy_id',
         'service_type_id',
@@ -26,6 +31,8 @@ class RequestedService extends Model
         'requested_hours' => 'decimal:2',
         'approved_hours' => 'decimal:2',
         'planned_hours' => 'decimal:2',
+        'planned_sessions' => 'integer',
+        'planned_from_schedule' => 'boolean',
         'service_type_id' => 'integer',
     ];
 
