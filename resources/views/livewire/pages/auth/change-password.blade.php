@@ -13,13 +13,6 @@ new #[Layout('layouts.guest')] class extends Component
     public string $password = '';
     public string $password_confirmation = '';
 
-    /**
-     * Define a nova senha e libera o acesso ao sistema.
-     *
-     * Não pedimos a senha atual de propósito: o usuário acabou de digitá-la no login e
-     * foi trazido para cá pelo middleware. Exigi-la de novo só adicionaria atrito num
-     * fluxo que já está autenticado.
-     */
     public function updatePassword(): void
     {
         try {
@@ -34,8 +27,6 @@ new #[Layout('layouts.guest')] class extends Component
 
         $user = Auth::user();
 
-        // Impede "trocar" pela mesma senha — sem isto o usuário poderia repetir
-        // 'mudar123' e continuar preso no mesmo laço, sem ganho nenhum de segurança.
         if (Hash::check($validated['password'], $user->password)) {
             $this->reset('password', 'password_confirmation');
 
@@ -49,7 +40,6 @@ new #[Layout('layouts.guest')] class extends Component
             'must_change_password' => false,
         ]);
 
-        // Registra a troca na auditoria, sem guardar nada da senha.
         activity()
             ->causedBy($user)
             ->performedOn($user)
@@ -64,10 +54,6 @@ new #[Layout('layouts.guest')] class extends Component
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
     }
 
-    /**
-     * Saída de emergência: usa a mesma ação de logout do restante do sistema (não existe
-     * rota nomeada 'logout' — o Breeze com Volt faz isso por ação Livewire).
-     */
     public function logout(Logout $logout): void
     {
         $logout();
@@ -92,13 +78,13 @@ new #[Layout('layouts.guest')] class extends Component
                 </svg>
                 <p class="text-sm leading-relaxed text-amber-800">
                     Sua conta ainda está com a <strong>senha padrão</strong>. Defina uma senha
-                    pessoal para continuar — ela será exigida nos próximos acessos.
+                    pessoal para continuar.
                 </p>
             </div>
 
             <h1 class="text-xl font-bold text-gray-900">Criar nova senha</h1>
             <p class="mt-1 text-sm text-gray-500">
-                Olá, {{ Auth::user()->name }}. Escolha uma senha que só você conheça.
+                Olá, {{ Auth::user()->name }}. Para sua segurança, mude sua senha.
             </p>
 
             <form wire:submit="updatePassword" class="mt-6 space-y-5">
@@ -130,8 +116,6 @@ new #[Layout('layouts.guest')] class extends Component
             </form>
         </div>
 
-        {{-- Saída de emergência, para ninguém ficar preso caso tenha entrado com a conta
-             errada. Funciona porque o middleware deixa passar as chamadas do Livewire. --}}
         <div class="mt-6 text-center">
             <button type="button" wire:click="logout" class="text-sm text-gray-500 hover:text-gray-900">
                 Sair e entrar com outra conta

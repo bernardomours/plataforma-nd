@@ -27,25 +27,12 @@ class Index extends Component
     public $therapy_id = '';
     public $therapies = [];
 
-    /**
-     * Filtro por faixa de aderência (realizada / planejada).
-     * Vazio = todas. Valores: cumprida | atencao | critico | grave | sem_plano
-     */
     public $faixa = '';
 
     public $units = [];
     public $availableYears = [];
 
-    /**
-     * Faixas de aderência usadas no painel e no filtro.
-     * Centralizadas aqui para que rótulo, cor e limite não se descolem entre
-     * o cálculo (SQL) e a exibição (Blade).
-     */
-    /**
-     * As classes de cor são gravadas por extenso de propósito: o Tailwind detecta classes
-     * varrendo o código-fonte, então algo como "bg-{$cor}-500" seria removido no purge e
-     * a cor não apareceria em produção.
-     */
+
     public const FAIXAS = [
         'cumprida' => [
             'rotulo' => 'Cumprida', 'descricao' => 'realizou 100% ou mais',
@@ -82,64 +69,17 @@ class Index extends Component
         $this->year = now()->year;
     }
 
-    /**
-     * Semanas consideradas por mês para converter o planejamento semanal em mensal.
-     *
-     * Usado apenas como RESERVA, para os registros antigos que só têm o valor semanal.
-     * A partir da derivação pela agenda, o mensal é apurado com precisão (quantas segundas,
-     * terças etc. o mês tem, descontados feriados) e gravado em planned_sessions.
-     */
     private const SEMANAS_NO_MES = 4;
 
-    /**
-     * Sessões planejadas no mês.
-     *
-     * Dois ajustes embutidos:
-     *  - planned_hours é varchar(255) no banco (a migration make_planned_hours_nullable
-     *    trocou decimal(8,2) por string), então convertemos explicitamente para número
-     *    em vez de depender de coerção implícita;
-     *  - multiplicamos pelas semanas do mês, pois o campo é semanal.
-     *
-     * Apesar do nome da coluna, o valor NÃO é hora: é quantidade de sessões.
-     */
     private const SQL_PLANEJADA = '(COALESCE(
         requested_services.planned_sessions,
         COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0) * ' . self::SEMANAS_NO_MES . '
     ))';
 
-    /** Valor SEMANAL, exibido como contexto embaixo do total mensal. */
     private const SQL_PLANEJADA_SEMANAL = 'COALESCE(NULLIF(requested_services.planned_hours, \'\') + 0, 0)';
 
-    /**
-     * Sessões efetivamente realizadas, vindas do JOIN agregado.
-     *
-     * Usamos appointments.session_number, que é o campo onde o sistema já grava a
-     * conversão de duração em sessões (40 min = 1 sessão; ABA de paciente Unimed = 60 min).
-     * Conferido contra os dados: a regra bate em 93% dos atendimentos ABA+Unimed e em 97%
-     * dos demais. Somar session_number é também o que a tela de Terapias Realizadas faz,
-     * e nas importações da Unimed o valor vem da própria planilha do convênio — ou seja,
-     * é o número que vale para faturamento. Recalcular pela duração aqui divergiria disso.
-     */
     private const SQL_REALIZADA = 'COALESCE(ap.sessoes, 0)';
 
-    /**
-     * Subconsulta que soma as SESSÕES realizadas por competência.
-     *
-     * Por que agregada e não correlacionada (como era antes):
-     *  - a versão anterior rodava um SELECT por linha listada;
-     *  - e, principalmente, casava apenas paciente + terapia + mês, IGNORANDO o tipo de
-     *    atendimento. Como requested_services tem uma linha por tipo, o mesmo total era
-     *    atribuído a todas as linhas do mesmo paciente/terapia/mês e somado novamente em
-     *    cada uma — 90 grupos duplicados na base.
-     *
-     * Também descartamos aqui os registros que corrompem o cálculo:
-     *  - check_out nulo (atendimento sem fechamento);
-     *  - check_out anterior ao check_in (erro de digitação): 4 registros que geravam
-     *    duração negativa.
-     *
-     * A duração em horas continua sendo somada porque é exibida como informação
-     * secundária na tabela — mas quem manda no indicador é a contagem de sessões.
-     */
     private function subqueryRealizado()
     {
         return DB::table('appointments')
@@ -152,30 +92,18 @@ class Index extends Component
             ->whereNotNull('check_in')
             ->whereNotNull('check_out')
             ->whereColumn('check_out', '>', 'check_in')
-            // Empurra o recorte de período para dentro da agregação: sem isto o MySQL
-            // agruparia as ~33 mil linhas inteiras a cada carregamento da tela.
             ->when($this->year, fn ($q) => $q->whereYear('appointment_date', $this->year))
             ->when($this->month, fn ($q) => $q->whereMonth('appointment_date', $this->month))
             ->groupBy('patient_id', 'therapy_id', 'service_type_id', 'ano', 'mes');
     }
 
-    /**
-     * Consulta base — ponto ÚNICO de construção.
-     *
-     * SEGURANÇA: o isolamento por unidade é aplicado aqui dentro, e não no render().
-     * Antes, os totais e a listagem eram montados em lugares diferentes; centralizar
-     * garante que nenhum agregado futuro escape do escopo do usuário por esquecimento.
-     */
     private function baseQuery()
     {
         $query = RequestedService::query()
             ->select('requested_services.*')
             ->selectRaw(self::SQL_REALIZADA . ' as realized_sessions')
-            // Alias distinto da coluna física planned_sessions: com 'requested_services.*'
-            // no select, repetir o nome quebra a subconsulta com "Duplicate column name".
             ->selectRaw(self::SQL_PLANEJADA . ' as planned_total')
             ->selectRaw(self::SQL_PLANEJADA_SEMANAL . ' as planned_weekly')
-            // Informação secundária, só para contexto na tabela.
             ->selectRaw('COALESCE(ap.horas, 0) as realized_hours')
             ->selectRaw('COALESCE(ap.atendimentos, 0) as realized_appointments')
             ->with(['patient.unit', 'therapy', 'serviceType'])
@@ -205,8 +133,6 @@ class Index extends Component
                 });
             })
             ->when($this->therapy_id, function ($query) {
-                // Coluna qualificada de propósito: a subconsulta 'ap' do leftJoinSub também
-                // expõe therapy_id, e sem o prefixo o MySQL acusaria coluna ambígua.
                 $query->where('requested_services.therapy_id', $this->therapy_id);
             })
             ->when($this->year, function ($query) {
@@ -216,8 +142,6 @@ class Index extends Component
                 $query->whereMonth('month_year', $this->month);
             });
 
-        // SEGURANÇA (multi-tenant): restringe às unidades permitidas ao usuário.
-        // null = admin/manager = acesso global, mesmo contrato do resto do sistema.
         $allowedUnits = auth()->user()->getAllowedUnitIds();
 
         if ($allowedUnits !== null) {
