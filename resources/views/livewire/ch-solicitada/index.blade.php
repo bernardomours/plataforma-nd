@@ -329,13 +329,29 @@
 
                             <tr wire:key="registro-{{ $registro->id }}" class="hover:bg-gray-50 transition-colors whitespace-nowrap">
                                 <td class="py-4 px-4 text-center"><input type="checkbox" class="rounded border-gray-300 text-blue-600 shadow-sm"></td>
-                                <td class="py-4 px-4 font-medium text-xs uppercase">{{ $registro->patient->name ?? '-' }}</td>
+                                <td class="py-4 px-4 font-medium text-xs uppercase">
+                                    {{ $registro->patient->name ?? '-' }}
+                                    @if($registro->patient?->deleted_at)
+                                        <span class="ml-1 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold normal-case text-gray-600"
+                                              title="Paciente com saída registrada em {{ \Carbon\Carbon::parse($registro->patient->deleted_at)->format('d/m/Y') }}. Os atendimentos deste mês continuam contando.">
+                                            saída {{ \Carbon\Carbon::parse($registro->patient->deleted_at)->format('d/m') }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="py-4 px-4 text-xs uppercase">{{ $registro->therapy->name ?? '-' }}</td>
                                 <td class="py-4 px-4 text-xs">{{ $registro->serviceType->name ?? 'Clínica' }}</td>
                                 <td class="py-4 px-4 text-xs">
                                     {{ $registro->month_year ? \Carbon\Carbon::parse($registro->month_year)->translatedFormat('F \d\e Y') : '-' }}
                                 </td>
-                                <td class="py-4 px-4 text-xs">{{ $registro->requisition_number ?? '-' }}</td>
+                                <td class="py-4 px-4 text-xs">
+                                    {{ $registro->requisition_number ?? '-' }}
+                                    @if(($registro->requisicoes ?? 1) > 1)
+                                        <span class="mt-0.5 block text-[10px] font-medium text-blue-600"
+                                              title="Autorizações complementares do convênio no mesmo mês. Solicitadas e autorizadas somam; o realizado é contado uma vez.">
+                                            {{ $registro->requisicoes }} requisições
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="py-4 px-4 text-center font-semibold">{{ number_format($registro->requested_hours ?? 0, 0, ',', '.') }}</td>
                                 <td class="py-4 px-4 text-center font-semibold">{{ number_format($registro->approved_hours ?? 0, 0, ',', '.') }}</td>
 

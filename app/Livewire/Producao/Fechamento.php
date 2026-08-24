@@ -11,6 +11,7 @@ use App\Models\Therapy;
 use App\Models\Unit;
 use Carbon\Carbon;
 use App\Models\ProfessionalPaymentRule;
+use App\Services\ProfessionalPayrollCalculator;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 #[Layout('layouts.producao')]
@@ -70,106 +71,8 @@ class Fechamento extends Component
             return $this->cacheProducao[$prof->id];
         }
 
-        $query = Appointment::with(['therapy', 'serviceType', 'patient.agreement']) 
-            ->where('professional_id', $prof->id)
-            ->whereYear('appointment_date', $this->ano)
-            ->whereMonth('appointment_date', $this->mes)
-            ->whereNotNull('check_in') 
-            ->where('is_glosado', false); 
-
-        if ($this->terapia_id) {
-            $query->where('therapy_id', $this->terapia_id);
-        }
-
-        $atendimentos = $query->get();
-
-        if ($atendimentos->isEmpty()) {
-            $resultado = ['sessoes' => 0, 'valor_regra' => 'Sem produção', 'valor_total' => 0];
-            $this->cacheProducao[$prof->id] = $resultado;
-            return $resultado;
-        }
-
-        $regras = ProfessionalPaymentRule::where('professional_id', $prof->id)->get();
-
-        if ($regras->isEmpty()) {
-            $resultado = [
-                'sessoes' => $atendimentos->sum('session_number'), 
-                'valor_regra' => 'Sem Regra Cadastrada', 
-                'valor_total' => 0
-            ];
-            $this->cacheProducao[$prof->id] = $resultado;
-            return $resultado;
-        }
-
-        $regrasOrdenadas = $regras->sortByDesc(function ($r) {
-            $score = 0;
-            if (!is_null($r->therapy_id)) $score++;
-            if (!is_null($r->service_type_id)) $score++;
-            if (!is_null($r->agreement_id)) $score++;
-            return $score;
-        });
-
-        $totalSessoes = 0;
-        $valorTotal = 0;
-        $resumoTextualRegras = []; 
-
-        foreach ($atendimentos as $atendimento) {
-            $qtdSessoes = $atendimento->session_number ?? 1;
-            $totalSessoes += $qtdSessoes;
-            
-            $pacienteConvenioId = $atendimento->patient->agreement_id ?? null;
-            $regraAplicada = null;
-
-            foreach ($regrasOrdenadas as $regra) {
-                $matchTherapy = is_null($regra->therapy_id) || $regra->therapy_id == $atendimento->therapy_id;
-                $matchAmbiente = is_null($regra->service_type_id) || $regra->service_type_id == $atendimento->service_type_id;
-                $matchConvenio = is_null($regra->agreement_id) || $regra->agreement_id == $pacienteConvenioId;
-
-                if ($matchTherapy && $matchAmbiente && $matchConvenio) {
-                    $regraAplicada = $regra;
-                    break;
-                }
-            }
-
-            if ($regraAplicada) {
-                if ($regraAplicada->payment_type == 'por_sessao' || $regraAplicada->payment_type == 'Por Sessão') {
-                    $valorTotal += $qtdSessoes * $regraAplicada->amount;
-
-                    $nomeEtiqueta = [];
-                    if ($regraAplicada->agreement_id) {
-                        $nomeEtiqueta[] = $atendimento->patient->agreement->name ?? 'Convênio Específico';
-                    }
-                    if ($regraAplicada->therapy_id) {
-                        $nomeEtiqueta[] = $atendimento->therapy->name ?? 'Terapia Específica';
-                    }
-                    if ($regraAplicada->service_type_id) {
-                        $nomeEtiqueta[] = $atendimento->serviceType->name ?? 'Ambiente Específico';
-                    }
-                    
-                    $chaveFiltro = empty($nomeEtiqueta) ? 'Regra Geral' : implode(' + ', $nomeEtiqueta);
-                    $resumoTextualRegras[$chaveFiltro] = $regraAplicada->amount;
-                } 
-            }
-        }
-
-        $textosExibicao = [];
-        foreach ($resumoTextualRegras as $nome => $valor) {
-            $textosExibicao[] = $nome . ' (R$ ' . number_format($valor, 2, ',', '.') . ')';
-        }
-        
-        $descricaoRegraFinal = empty($textosExibicao) 
-            ? 'Regras Incompatíveis' 
-            : implode(' | ', $textosExibicao);
-
-        $resultado = [
-            'sessoes' => $totalSessoes,
-            'valor_regra' => $descricaoRegraFinal,
-            'valor_total' => $valorTotal
-        ];
-
-        $this->cacheProducao[$prof->id] = $resultado;
-
-        return $resultado;
+        return $this->cacheProducao[$prof->id] = app(ProfessionalPayrollCalculator::class)
+            ->resumoDoProfissional($prof, $this->ano, $this->mes, $this->terapia_id ?: null);
     }
 
     public function abrirExtrato($profissionalId)

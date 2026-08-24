@@ -15,19 +15,15 @@ class RegistroModal extends Component
 {
     public $isModalOpen = false;
     public ?Patient $patient = null;
-    public $isHumana = false; // Flag para controlar a tela
+    public $isHumana = false; 
 
-    /** O paciente tem agenda cadastrada? Controla o aviso na tela. */
     public $temAgenda = false;
 
-    // Campos Fixos (Cabeçalho)
     public $month_year = '';
     public $requisition_number = '';
 
-    // Repeater Dinâmico
     public $terapias = [];
 
-    // Transformado em método para a regra ser dinâmica
     protected function rules()
     {
         $rules = [
@@ -38,11 +34,9 @@ class RegistroModal extends Component
             'terapias.*.requested_hours' => 'required|numeric|min:0',
             'terapias.*.approved_hours' => 'nullable|numeric|min:0',
             'terapias.*.planned_hours' => 'nullable|numeric|min:0',
-            // Total de sessões do MÊS, derivado da agenda mas editável.
             'terapias.*.planned_sessions' => 'nullable|integer|min:0',
         ];
 
-        // Se for Humana, exige a requisição por terapia. Se não, exige a global.
         if ($this->isHumana) {
             $rules['terapias.*.requisition_number'] = 'required|string';
         } else {
@@ -66,17 +60,15 @@ class RegistroModal extends Component
         $this->resetValidation();
         $this->resetForm();
 
-        // Carrega o paciente já com o convênio para evitar consultas extras
         $this->patient = Patient::with('agreement')->findOrFail($pacienteId);
         $this->month_year = $mesReferencia; 
 
-        // Verifica se é convênio Humana
         $nomeConvenio = mb_strtolower($this->patient->agreement?->name ?? '');
         $this->isHumana = str_contains($nomeConvenio, 'humana');
 
         $this->temAgenda = app(PlannedSessionsFromSchedule::class)->pacienteTemAgenda($this->patient);
 
-        $this->adicionarTerapia(); // Inicia com 1 linha vazia
+        $this->adicionarTerapia(); 
         $this->isModalOpen = true;
     }
 
@@ -103,11 +95,11 @@ class RegistroModal extends Component
             'service_type_id' => '',
             'requested_hours' => '',
             'approved_hours' => '',
-            'planned_hours' => '',          // sessões por SEMANA (contexto)
-            'planned_sessions' => '',       // sessões no MÊS (é o que vale no cálculo)
+            'planned_hours' => '',        
+            'planned_sessions' => '',       
             'planned_from_schedule' => false,
             'agenda_blocos' => [],
-            'requisition_number' => '', // Adicionado ao repeater
+            'requisition_number' => '',
         ];
     }
 
@@ -128,7 +120,6 @@ class RegistroModal extends Component
                 'patient_id' => $this->patient->id,
                 'month_year' => $formattedDate,
                 
-                // Salva a requisição correta dependendo do convênio
                 'requisition_number' => $this->isHumana ? $terapia['requisition_number'] : $this->requisition_number,
                 
                 'therapy_id' => $terapia['therapy_id'],
@@ -136,8 +127,6 @@ class RegistroModal extends Component
                 'requested_hours' => $terapia['requested_hours'],
                 'approved_hours' => $terapia['approved_hours'] ?: null,
                 'planned_hours' => $terapia['planned_hours'] ?: null,
-                // CONGELAMENTO: o total do mês é gravado agora e não muda mais sozinho,
-                // ainda que a agenda seja alterada depois. Competência fechada fica fechada.
                 'planned_sessions' => $terapia['planned_sessions'] !== '' ? (int) $terapia['planned_sessions'] : null,
                 'planned_from_schedule' => (bool) ($terapia['planned_from_schedule'] ?? false),
             ]);
@@ -147,9 +136,6 @@ class RegistroModal extends Component
         $this->dispatch('ch-salva-com-sucesso');
     }
 
-    /**
-     * Recalcula o planejado sempre que a linha ganha terapia + tipo, ou o mês muda.
-     */
     public function updated($property)
     {
         if (preg_match('/^terapias\.(\d+)\.(therapy_id|service_type_id)$/', $property, $m)) {
@@ -157,8 +143,6 @@ class RegistroModal extends Component
             return;
         }
 
-        // Edição manual do total desmarca a origem "agenda" — a tela passa a sinalizar
-        // que aquele número foi ajustado à mão.
         if (preg_match('/^terapias\.(\d+)\.planned_sessions$/', $property, $m)) {
             $this->terapias[(int) $m[1]]['planned_from_schedule'] = false;
             return;
@@ -171,11 +155,6 @@ class RegistroModal extends Component
         }
     }
 
-    /**
-     * Pré-preenche a linha com o que a agenda do paciente indica para a competência.
-     * Não sobrescreve nada quando não há agenda para aquela terapia + tipo — nesse caso
-     * o campo segue manual e a tela avisa.
-     */
     private function preencherPelaAgenda(int $indice): void
     {
         $linha = $this->terapias[$indice] ?? null;

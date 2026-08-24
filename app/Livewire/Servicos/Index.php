@@ -13,8 +13,7 @@ class Index extends Component
 {
     public function getCanEditProperty()
     {
-        $role = auth()->user()->role; 
-        return in_array($role, ['admin', 'manager']);
+        return auth()->user()->hasAnyRole(['admin', 'manager']);
     }
 
     public function toggleTherapyUnit($therapyId, $unitId)

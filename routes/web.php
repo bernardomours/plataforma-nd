@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Auth;
 use App\Livewire\Pacientes\Index as PacientesIndex;
 use App\Livewire\Pacientes\Create as PacientesCreate;
 use App\Livewire\Pacientes\Show as PacientesShow;
-use App\Livewire\Pacientes\Edit as PacientesEdit;
-use App\Livewire\Pacientes\Agenda as PacientesAgenda;
-use App\Livewire\Pacientes\CargaHoraria as PacientesCargaHoraria;
 use App\Livewire\Profissionais\Index as ProfissionaisIndex;
 use App\Livewire\Profissionais\Create as ProfissionaisCreate;
 use App\Livewire\Profissionais\Edit as ProfissionaisEdit;
@@ -33,6 +30,7 @@ use App\Livewire\Producao\Fechamento as ProducaoFechamento;
 use App\Livewire\Producao\Index as ProducaoIndex;
 use App\Livewire\Producao\RegrasPagamento\Index as RegrasPagamentoIndex;
 use App\Livewire\Producao\AtendimentosRealizados\Index as AtendimentosIndex;
+use App\Livewire\Producao\Glosas\Index as GlosasIndex;
 use App\Livewire\AuditoriaHumana\Index as AtendimentoHumanaIndex;
 use App\Livewire\Qualidade\Index as QualidadeIndex;
 use App\Livewire\Qualidade\Create as QualidadeCreate;
@@ -98,6 +96,7 @@ Route::middleware(['auth', 'producao.access'])->prefix('producao')->group(functi
     Route::get('/fechamento', ProducaoFechamento::class)->name('producao.fechamento');
     Route::get('/regras-pagamento', RegrasPagamentoIndex::class)->name('producao.regras');
     Route::get('/auditoria-atendimentos', AtendimentosIndex::class)->name('producao.auditoria');
+    Route::get('/glosas', GlosasIndex::class)->name('producao.glosas');
     
     Route::post('/sair', function (Request $request) {
         Auth::logout();

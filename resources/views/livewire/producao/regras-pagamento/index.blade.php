@@ -11,6 +11,61 @@
         </button>
     </div>
 
+    <!-- Filtros -->
+    <div class="mb-4 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+
+            <div class="flex-1 min-w-0">
+                <label for="busca" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Pesquisar profissional
+                </label>
+                <div class="relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+                        </svg>
+                    </span>
+                    <input id="busca" type="search" wire:model.live.debounce.300ms="busca"
+                           placeholder="Digite o nome do profissional..."
+                           class="w-full rounded-lg border-gray-300 pl-9 pr-9 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <span wire:loading wire:target="busca" class="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <svg class="w-4 h-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                            <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            <div class="sm:w-72">
+                <label for="unidade" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Unidade
+                </label>
+                <select id="unidade" wire:model.live="unidade_id"
+                        class="w-full rounded-lg border-gray-300 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">Todas as unidades</option>
+                    @foreach($unidadesLista as $unidade)
+                        <option value="{{ $unidade->id }}">{{ $unidade->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            @if($busca !== '' || $unidade_id)
+                <button type="button" wire:click="limparFiltros"
+                        class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
+                    Limpar filtros
+                </button>
+            @endif
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500">
+            {{ $regras->total() }} {{ $regras->total() === 1 ? 'regra encontrada' : 'regras encontradas' }}
+            @if($busca !== '' || $unidade_id)
+                <span class="text-gray-400">— de {{ \App\Models\ProfessionalPaymentRule::count() }} no total</span>
+            @endif
+        </p>
+    </div>
+
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm border-collapse">
@@ -28,7 +83,12 @@
                 <tbody class="divide-y divide-gray-100">
                     @forelse($regras as $regra)
                         <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="py-4 px-4 font-medium text-gray-900">{{ $regra->professional->name ?? 'N/A' }}</td>
+                            <td class="py-4 px-4 font-medium text-gray-900">
+                                {{ $regra->professional->name ?? 'Profissional #' . $regra->professional_id }}
+                                @if($regra->professional?->trashed())
+                                    <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500 align-middle">INATIVO</span>
+                                @endif
+                            </td>
                             
                             <td class="py-4 px-4">
                                 @if($regra->payment_type === 'por_sessao')
@@ -70,7 +130,14 @@
                     @empty
                         <tr>
                             <td colspan="7" class="py-8 text-center text-gray-500 text-sm">
-                                Nenhuma regra de pagamento cadastrada.
+                                @if($busca !== '' || $unidade_id)
+                                    Nenhuma regra encontrada para os filtros aplicados.
+                                    <button type="button" wire:click="limparFiltros" class="ml-1 font-semibold text-blue-600 hover:text-blue-700">
+                                        Limpar filtros
+                                    </button>
+                                @else
+                                    Nenhuma regra de pagamento cadastrada.
+                                @endif
                             </td>
                         </tr>
                     @endforelse

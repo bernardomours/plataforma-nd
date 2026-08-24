@@ -3,20 +3,46 @@
 Sistema de gestão para clínicas de terapia infantil (Núcleo Desenvolve), multi-unidade.
 Laravel 13 · Livewire 3 (+ Volt) · Tailwind · Alpine · MySQL · Spatie Permission · Spatie Activitylog v5.
 
-Hospedagem: Hostinger, plano compartilhado. **Deploy exige `npm run build` no servidor** — o
-Tailwind gera apenas as classes que encontra varrendo o código, e correções em Blade que
-dependem de classes novas não surtem efeito sem rebuild.
+Hospedagem: Hostinger, plano **compartilhado**. Sem VPS, sem root, cota de disco e de inodes.
+**Deploy exige `npm run build` no servidor** — o Tailwind gera apenas as classes que encontra
+varrendo o código, e correção em Blade que dependa de classe nova não surte efeito sem rebuild.
+
+---
+
+## Autorização
+
+**Spatie é a única fonte de papel.** Rotas (`role:admin|manager`), `User::isAdmin()`, telas de
+Usuários e todas as checagens de componente usam `hasAnyRole()`.
+
+A coluna `users.role` é **legado morto**: nunca foi escrita pelas telas (que só chamam
+`syncRoles()`), ficou congelada desde a migration de 04/2026 e não é mais lida por nada. Chegou a
+divergir feio — dizia `administrative` para 235 usuários que no Spatie são `profissional`. A troca
+das quatro leituras para Spatie não tirou acesso de ninguém e passou a aplicar o filtro de visitas
+a 3 coordenadores que antes viam tudo. Pode ser removida por migration quando houver confiança.
+
+Não confundir com **`professionals.role`**, que é outra coluna, legítima, com o enum
+`ProfessionalRole` (supervisor/coordinator/therapist/uncategorized).
+
+Papéis cadastrados no Spatie: `admin`, `manager`, `administrative`, `coordinator`, `profissional`.
+**`supervisor` não existe como papel de acesso** — só como `ProfessionalRole`. As checagens que
+citam supervisor casam apenas com coordenadores hoje.
+
+17 usuários acumulam mais de um papel (o padrão é `coordinator` + `profissional`), então testar
+autorização exige usuário com papel **exclusivo** — senão o resultado engana.
+
+Checagem em componente **não é redundante** com o middleware da rota: as ações do Livewire vão
+para `livewire/update`, que não reexecuta o middleware da rota original.
 
 ---
 
 ## Isolamento multi-unidade
 
 Contrato único: `User::getAllowedUnitIds()` devolve `null` para admin/manager (acesso global)
-ou um array de ids. Toda consulta que traz dado de paciente respeita isso.
+ou um array de ids. Complementos: `User::canAccessUnit()` e `canAccessAnyUnit()`.
 
 - `Patient` isola sozinho via trait `App\Traits\IsolatesByUnit` (global scope sobre `unit_id`).
 - `Professional` **não tem** `unit_id` — o vínculo é a pivô `professional_unit`. Filtrar com
-  `whereHas('units', ...)`. Usar `User::canAccessAnyUnit()`.
+  `whereHas('units', ...)`.
 - `Appointment`, `RequestedService`, `Schedule` e `NeuroAssessment` não têm scope próprio:
   a checagem é explícita, geralmente pela unidade do paciente.
 
@@ -25,6 +51,23 @@ Ao remover scopes, preferir `withoutGlobalScope(SoftDeletingScope::class)`.
 
 Componentes Livewire re-hidratam **sem executar `mount()`**. Autorização feita só no `mount()`
 não protege: repetir a checagem em todo método que grava ou exclui.
+
+---
+
+## Domínio
+
+```
+Unit --< Patient --< Appointment >-- Professional
+                 |-< RequestedService (CH por competência)
+                 |-< Schedule (grade semanal)
+                 |-< PatientService (coordenador/supervisor por tipo)
+                 |-< NeuroAssessment --< NeuroSession
+                 |-< Visit (acompanhamento domiciliar/escolar)
+                 |-< MovementHistory (saída/retorno, polimórfico)
+```
+
+`Therapy`, `ServiceType` (Clínica/Escolar/Domiciliar) e `Agreement` (Humana, Unimed, Sulamérica,
+Central Nacional, Particular) são tabelas de apoio, vinculadas a unidades por pivô.
 
 ---
 
@@ -38,7 +81,9 @@ não protege: repetir a checagem em todo método que grava ou exclui.
 | qualquer outro | ABA | 60 min |
 | qualquer outro | demais | 40 min |
 
-Conferido contra ~32 mil atendimentos: bate em 94–99% conforme o grupo.
+Conferido contra ~57 mil atendimentos: bate em 94–99% conforme o grupo.
+Implementada em `PlannedSessionsFromSchedule::duracaoDaSessao()` e replicada em
+`TerapiasRealizadas\Create|Edit::calculateSessions()`.
 
 ### Sessões realizadas
 
@@ -51,30 +96,27 @@ na base que geravam duração negativa).
 
 ### Carga horária: os campos são SESSÕES, não horas
 
-Apesar dos nomes, `requested_hours`, `approved_hours` e `planned_hours` contam sessões.
-
 | Coluna | Significado |
 |---|---|
 | `requested_hours` | sessões pedidas ao convênio, no mês |
 | `approved_hours` | sessões autorizadas, no mês |
-| `planned_hours` | sessões por **SEMANA** (legado, `varchar` — converter explicitamente no SQL) |
+| `planned_hours` | sessões por **SEMANA** (legado, `varchar` — converter no SQL) |
 | `planned_sessions` | sessões no **MÊS**, congelado ao salvar |
 | `planned_from_schedule` | se o valor veio da agenda ou foi digitado |
 
-Leitura do planejado usa `COALESCE(planned_sessions, planned_hours * 4)` — o fallback atende
-os registros anteriores à derivação pela agenda.
+Leitura do planejado: `COALESCE(planned_sessions, planned_hours * 4)`.
 
 ### CH Planejada derivada da agenda
 
 `App\Services\PlannedSessionsFromSchedule`. Três passos:
 
-1. cada bloco da agenda vira sessões pela regra de duração acima (um bloco não é uma sessão —
+1. cada bloco da agenda vira sessões pela regra de duração (um bloco não é uma sessão —
    há blocos de 40 a 240 minutos);
 2. conta as ocorrências daquele dia da semana no mês, **descontando feriados** (`holidays`);
 3. multiplica.
 
-O passo 2 é o ponto: setembro/2026 tem 5 terças e 4 segundas, outubro tem 5 sextas.
-Multiplicar tudo por 4 erra nos dois sentidos.
+Setembro/2026 tem 5 terças e 4 segundas; outubro tem 5 sextas. Multiplicar tudo por 4 erra
+nos dois sentidos.
 
 **Congelamento:** ao salvar a CH, `planned_sessions` é gravado e não muda mais. Alterar a agenda
 depois não reescreve competência fechada; a tela mostra a divergência sem aplicá-la.
@@ -92,17 +134,224 @@ aplicaria a grade de hoje a um mês fechado. Sem `--fix` o comando apenas simula
 `schedules` é grade semanal vigente, **sem histórico**. Ignorar blocos `is_blocked`, sem
 `therapy_id`/`service_type_id`, ou com `end_time <= start_time`.
 
+A tabela `holidays` existe e o desconto está implementado, mas **está vazia e não há tela nem
+seeder** — o desconto é inerte até alguém alimentá-la.
+
 ### Convênio e unidade do atendimento
 
 `appointments.agreement_id` e `appointments.unit_id` guardam o que valia **no momento do
 atendimento**. Antes só existiam no cadastro do paciente, então trocar o convênio ou transferir
 de unidade reescrevia todo o histórico retroativamente (aconteceu em produção com dois pacientes).
 
-O padrão vem do paciente e é sobrescrevível no lançamento (restrito a `admin|manager|administrative`).
-A regra de duração da sessão lê o convênio **do atendimento**, não o do cadastro.
+O padrão vem do paciente e é sobrescrevível no lançamento (restrito a `admin`, `manager` e
+`administrative`). A regra de duração da sessão lê o convênio **do atendimento**, não o do cadastro.
 
-Relatórios filtram por essas colunas com fallback para o paciente quando nulas (registros antigos).
-O **controle de acesso** continua indo pela unidade do paciente — decisão consciente, não migrada.
+Relatórios filtram por essas colunas com fallback para o paciente quando nulas. O **controle de
+acesso** continua indo pela unidade do paciente — decisão consciente, não migrada.
+
+### Requisições complementares
+
+O convênio autoriza a CH em requisições parciais: o mesmo paciente pode ter duas linhas em
+`requested_services` para a mesma terapia no mês, com números distintos. Não é duplicidade —
+em julho/2026, 33 dos 35 grupos tinham requisições diferentes, e em 13 deles o realizado
+ultrapassava a maior requisição isolada.
+
+`ChSolicitada\Index` agrupa por **paciente + terapia + tipo + competência**:
+
+| Campo | Como agrega |
+|---|---|
+| solicitadas, autorizadas, planejadas | `SUM` entre as requisições |
+| realizado | `MAX` — já vem agregado por combinação; somar contaria o mesmo atendimento por requisição |
+
+Sem o agrupamento, julho/2026 exibia 15.868 sessões contra 14.777 reais. O filtro de faixa usa
+`HAVING` (compara agregados), não `WHERE`. `appointments.guide` **não** vincula atendimento a
+requisição — numerações diferentes, zero correspondências.
+
+### Produção e pagamento
+
+`App\Services\ProfessionalPayrollCalculator` é a **única** implementação do cálculo;
+`Producao\Fechamento` e `Producao\Index` delegam a ele. `ProfessionalPaymentRule` pode filtrar
+por `therapy_id`, `service_type_id` e `agreement_id` — qualquer um deles nulo funciona como
+curinga. As regras são ordenadas por **especificidade** (quantos campos preenchidos) e vence a
+primeira que casar. `payment_type` aceita `por_sessao` e `Por Sessão`.
+
+Entram no cálculo apenas atendimentos com `check_in` preenchido e `is_glosado = false`.
+O convênio considerado é o **do atendimento**, com fallback para o do paciente — mesma regra
+já usada na duração da sessão. (O Fechamento lia só o do paciente; após o backfill os dois
+caminhos dão idêntico, mas o congelado é o correto daqui em diante.)
+
+**O buraco do repasse.** Só 63 dos 237 profissionais têm regra cadastrada. Em agosto/2026,
+142 produziram sem nenhuma regra — 6.323 sessões que fecham em R$ 0,00 — e mais 3 têm regra
+com `payment_type` `por_hora` ou `por_dia`, que o cálculo **não sabe converter em valor** e
+ignora em silêncio. Total apurado: R$ 60.207,00 sobre 9.077 sessões, ou seja, 70% da produção
+sai zerada. A Index expõe isso; corrigir os tipos não suportados exige decisão de negócio
+(o que é um "dia" ou uma "hora" de trabalho) e mexe em dinheiro.
+
+Profissional inativado continua produzindo até a data da saída, mas **some da tela de
+Fechamento**, que lista só ativos. Em agosto foram 5 profissionais, 118 sessões, R$ 350,00.
+A Index lista esses casos à parte, para o acerto de saída não passar batido.
+
+### Painel da Produção
+
+`Producao\Index` mostra a competência escolhida (12 meses no seletor) com KPIs, pendências,
+ranking de repasses e volume dos últimos 6 meses. Mês corrente é comparado com o **mesmo
+período** do mês anterior: em 19/08 a comparação contra julho inteiro daria −44,6%, contra
+julho até o dia 19 dá −0,2%.
+
+`check_in` nunca é nulo na base — a pendência útil é `check_out`, que não afeta o repasse
+mas derruba o atendimento da CH (ver "Por que CH Solicitada e Relatórios Gerais divergem").
+
+---
+
+### Glosas do convênio
+
+Origem: relatório `NAT_RELATORIO_CPLS_AAAAMM` / `MOS_RELATORIO_CPLS_AAAAMM` da Unimed, uma vez
+por mês. `App\Services\GlosaReportImporter` + `glosas:importar` leem **dois formatos**,
+detectados pelo separador:
+
+| Formato | Separador | Datas | Cobre |
+|---|---|---|---|
+| `.xls` original (é TSV, ISO-8859-1) | tab | `dd/mm/aaaa`, comp. `mm/aaaa` | um prestador, um mês |
+| CSV do pipeline do Drive | `;` | ISO, carteira já sem zeros | vários prestadores e meses |
+
+O pipeline converte PDF+XLS em CSV e deixa em
+`H:\Meu Drive\processed\unimed__demonstrativo_producao_{pdf,xls}`. O consolidado
+`unimed__demonstrativo_producao_xls.csv` cresce a cada mês e tem o histórico inteiro. Em
+24/08/2026: 79.246 linhas, **12 competências x 2 prestadores = 24 remessas**, 05/2025 a
+07/2026 com buracos (faltam 02, 03 e 05/2026).
+
+`--competencia=AAAA-MM` filtra **na leitura**. Sem ele, o consolidado inteiro consome ~550 MB
+de pico e não passa em hospedagem compartilhada; com ele, 146 MB. É assim que se importa o mês
+novo: apontar para o consolidado e filtrar, sem precisar fatiar o arquivo antes.
+
+Três tabelas — `glosa_batches` (remessa), `glosa_items` (linha) e `glosa_reasons` (motivos) —
+mais o catálogo `glosa_reason_codes`. Fica **fora de `appointments`** de propósito: o relatório
+é documento do convênio, chega meses depois (competência 06/2026 emitida em 10/07 cobre
+atendimentos de abril e maio), pode ser reemitido, e boa parte das linhas não tem atendimento
+correspondente — precisam existir mesmo assim, senão o total nunca fecha com o RESUMO do PDF.
+
+**A glosa é informativa.** Não marca `appointments.is_glosado` nem altera repasse: quando o
+relatório chega, a competência já foi paga.
+
+| Campo do arquivo | Liga em | Observação |
+|---|---|---|
+| `Guia` | `appointments.guide` | **1:1, nunca ambíguo** |
+| cabeçalho do prestador | `units.unimed_code` | 21000430 -> LEAL E CARVALHO; 38000104 -> LIMEIRA |
+| `Carteira` | `patients.agreement_number` | o `.xls` traz zeros à esquerda, o cadastro não |
+| `Medico` | — | **não usar**: diverge do cadastro por acento e ordem do nome |
+
+Não confundir com a outra ponta: `guide` liga atendimento ao relatório do convênio, mas **não**
+liga atendimento a requisição (ver "Requisições complementares").
+
+Só as unidades com Unimed têm `unimed_code`. CL INTERVENÇÃO COMPORTAMENTAL (João Câmara) e
+CL II (Santa Cruz) ainda não atendem o convênio; arquivo de código desconhecido é recusado.
+
+**Conciliação só existe de 02/2026 em diante**, que é quando a plataforma passa a ter
+atendimentos. Todo 2025 importa com 0% conciliado — a glosa fica registrada, mas sem
+profissional atribuível. 04/2026 concilia 97%, 06/2026 concilia 76%.
+
+**Motivos.** Uma linha pode ter vários, separados por vírgula: `3145 - NAO AUTORIZADO POR
+MOTIVO TECNICO, CM89 - Guia sem execução cirúrgica`. **Não dá para quebrar em toda vírgula** —
+a descrição também tem vírgula ("Conforme prescrição e autorização, evidencias..."). O corte só
+acontece antes de um novo código (`CM89`, `3145`, `INTADM120`) ou de um marcador
+`Ocorrencia -`/`Parecer -`, que é como o PDF anota.
+
+O catálogo `glosa_reason_codes` existe porque **o mesmo código chega com duas grafias**: a
+conversão para CSV perdeu acentos em parte dos meses, então convivem "Cobrança de item..." e
+"Cobran?a de item...". Sem catálogo o ranking parte o motivo em duas linhas. O código é ASCII e
+nunca corrompe — ele é a chave; a descrição canônica é a grafia com menos caractere de
+substituição, **não a mais frequente** (em vários códigos a corrompida é a que mais aparece).
+`orientacao` está livre para a clínica anotar como evitar a glosa.
+
+**O quadro geral:** R$ 9.452.378,00 apresentados, R$ 565.350,00 glosados (5,98%) em 12
+competências. Por competência o índice oscila muito — 16,91% em 05/2025, 2,30% em 11/2025,
+4,11% em 06/2026, 2,60% em 07/2026. Motivos mais frequentes: CM89, CM100, CM74, 3145, CM107.
+São 22 códigos; 07/2026 trouxe o `1706 - Valor apresentado a menor`.
+
+A conciliação melhora conforme a plataforma amadurece: 97% em 04/2026, 76% em 06/2026,
+**91% em 07/2026**.
+
+**Glosa previsível.** Em 06/2026, os 45 glosados por `CM107 - Tempo de execução insuficiente`
+que casaram por guia têm duração de exatamente 1 minuto na plataforma
+(`check_out = check_in + 60s`), criados em lote pela importação da Unimed; dos 2.828 não
+glosados que casaram, a duração mínima é 21 minutos. **07/2026 repete o padrão em amostra
+independente: 75 de 75.** São ~435 atendimentos nessa condição na base, 39 a 82 por mês.
+Continua sendo correlação, não causalidade provada — o 1 minuto e a glosa provavelmente têm a
+mesma origem, o que foi enviado ao convênio —, mas com dois meses batendo 100% vale tratar
+como alerta antes de faturar.
+
+**Conferência cruzada.** O pipeline gera duas leituras independentes do mesmo relatório:
+`unimed__demonstrativo_producao_xls/` traz o consolidado do XLS (é o que se importa — tem
+`Medico`, `Carteira`, `Item`, `Lote`) e `unimed__demonstrativo_producao_pdf/` traz um CSV por
+competência extraído do PDF (não tem `Medico`, serve só para conferir). `glosas:conferir`
+compara as duas. Em 21/08/2026: **20 das 22 remessas batem item a item e no valor**; 01/2026
+não tem arquivo do PDF, então ficou sem conferência externa.
+
+A ordem das colunas do CSV do PDF **muda de arquivo para arquivo** — `Ocorrencia_1` e
+`Parecer_1` trocam de lugar entre os meses. Mapear por nome, nunca por posição.
+
+O nome de outubro/2025 do NAT está trocado: `NAT_RELATORIO_CPLS_102025.csv` em vez de `202510`.
+Não atrapalha, porque a competência é lida de dentro do arquivo.
+
+**A tela.** `Producao\Glosas\Index` (`/producao/glosas`) tem **duas faixas de filtro com
+escopos diferentes**, e isso é deliberado: competência e unidade recortam a página inteira
+(KPIs, gráfico, rankings, lista); motivo, busca e situação recortam **só a lista**. Filtrar KPI
+por motivo produziria número sem sentido — "valor apresentado do CM89" não existe, porque o
+apresentado é do item, não do motivo. O gráfico de evolução responde só à unidade, já que a
+competência é o próprio eixo x.
+
+**Ranking por profissional usa `medico_nome`, não o profissional conciliado.** Em 06/2026 só
+59 dos 198 glosados acham atendimento pela guia; restringir a eles escondia o maior caso do mês
+(DIAENE JOAQUINA, 13 guias, R$ 3.264,00). O nome do relatório existe em toda linha, então é ele
+que agrupa — normalizado, porque as grafias divergem entre relatório e cadastro. O nome exibido
+é o do cadastro quando há vínculo. Quem não tem nenhuma guia conciliada leva o selo "sem
+vínculo": aparece no ranking, mas não dá para abrir o atendimento.
+
+Conferido contra o BI antigo em 06/2026: os sete primeiros batem exatamente (DIAENE 13,
+MARIA CLARA 10, DEBORA 10, BARBARA 7, WILLIAN 7, JOAO VICTOR 6, FERNANDA 6).
+
+**O BI antigo conta motivo em dobro.** Em 06/2026 o Looker mostra CM100=172, CM107=125,
+CM121=4; o arquivo tem 86, 111 e 2. A conta fecha se as linhas do prestador 38000104 forem
+contadas duas vezes: CM107 = 97 (21000430) + 14x2 = 125; CM100 = 86x2 = 172; CM121 = 2x2 = 4.
+Os rankings de beneficiário e profissional do Looker não sentem a duplicata porque contam
+`DISTINCT` guia; o de motivo é `COUNT` simples. Os KPIs também dobram a parte da Limeira e
+batem nos quatro: 689.198 + 264.582 = 953.780 (Looker "953,8 mil"); glosa 28.358 + 16.206 =
+44.564 ("44,6 mil"); liberado 660.852 + 248.388 = 909.240 ("909,2 mil"); 4,67% ("4,7%").
+
+A contagem de linhas do Looker (5.695 contra 5.698) é outra coisa, e não é erro: são 3 pares de
+linhas que só diferem em colunas que a tabela dele não exibe, e o Looker Studio agrupa a tabela
+pelas dimensões mostradas. Note que a tabela dele mostra 5.695 enquanto os KPIs somam como se
+houvesse 7.752 — **o BI está inconsistente consigo mesmo**. Se alguém comparar as duas telas,
+é isto.
+
+Barra do gráfico e linha do ranking de motivos são clicáveis e aplicam o filtro
+correspondente; clicar de novo na mesma limpa.
+
+**Dado sujo na origem:** 6 linhas em 79.246 têm `apresentado - glosa != liberado` — uma com
+apresentado 180, glosa 180 e liberado 180 ao mesmo tempo, e duas em 07/2026 onde o convênio
+liberou 136 tendo sido apresentados 130. O comando avisa e não corrige: o erro é do relatório.
+
+## Por que CH Solicitada e Relatórios Gerais divergem
+
+São perguntas diferentes, não erro de cálculo. `Relatorios\Geral` faz `Appointment::query()`
+puro: conta tudo que foi lançado. `ChSolicitada\Index` parte de `requested_services` e só
+enxerga o atendimento que tem CH cadastrada.
+
+Restam dois fatores, ambos de processo:
+
+| Fator | Efeito na CH |
+|---|---|
+| `check_out` nulo ou anterior ao `check_in` | descartado — o sistema não sabe a duração |
+| Atendimento sem CH cadastrada | não aparece (é o maior fator) |
+
+Julho/2026: 15.862 sessões atendidas − 221 sem check-out − 652 sem CH = 14.989 na CH.
+Reconciliação exata, resíduo zero. Medir com `php artisan ch:conferir-divergencia --mes=YYYY-MM`.
+
+Dois fatores foram corrigidos e deixaram de existir: requisições complementares contadas em
+dobro, e paciente com saída registrada — a alta apagava retroativamente as competências
+anteriores. A tela usa `withTrashed()` em todos os filtros por paciente, **inclusive no
+isolamento por unidade**; o mês seguinte se resolve sozinho, já que ninguém cadastra CH para
+quem saiu.
 
 ---
 
@@ -113,50 +362,94 @@ Activitylog v5. Namespaces mudaram em relação à v4:
 `dontSubmitEmptyLogs()` virou `dontLogEmptyChanges()`. `tapActivity()` não existe.
 `useAttributeRawValues()` é **incompatível com cast de enum** (lança `ValueError` ao salvar).
 
-Logam apenas `created` e `updated`: saída e retorno já são registrados via `MovementHistory`,
-que carrega o motivo. Logar `deleted`/`restored` duplicaria cada movimentação na tela.
+`Patient` e `Professional` logam apenas `created` e `updated`: saída e retorno já são
+registrados via `MovementHistory`, que carrega o motivo. `Appointment` e `Visit` têm o
+`getActivitylogOptions()` pronto mas o trait **desativado**.
 
 Exclusão permanente (`forceDelete`) não dispara evento — registrar manualmente com `activity()`
 antes de apagar, com snapshot dos dados.
+
+A tela `Controles\Index` resolve a unidade de cada registro por caminhos diferentes conforme o
+tipo (paciente por `unit_id`, profissional pela pivô, movimentação pelo `moveable`).
 
 ---
 
 ## Contas de acesso
 
-Cadastrar profissional com e-mail cria um `User` (senha inicial `mudar123`, `must_change_password = true`).
-O middleware `EnsurePasswordIsChanged` prende na tela `/trocar-senha` até a troca.
+Cadastrar profissional com e-mail cria um `User` (senha inicial `mudar123`,
+`must_change_password = true`). O middleware `EnsurePasswordIsChanged` prende na tela
+`/trocar-senha` até a troca — ele libera `livewire/*`, senão o próprio formulário e o logout
+ficariam bloqueados.
 
 Inativar profissional **revoga o acesso** (soft delete do `User`). Não vale o inverso: excluir
-usuário não inativa o profissional — são coisas diferentes.
+usuário não inativa o profissional — são coisas diferentes, decisão consciente.
 
 Guardas na revogação: não desativa a própria conta de quem executa, nem conta compartilhada por
 outro profissional ativo (`User::firstOrCreate` por e-mail permite compartilhamento).
 
-Comandos: `usuarios:revogar-inativos`, `usuarios:marcar-senha-padrao` (ambos com `--fix`;
-sem a flag apenas diagnosticam).
+Risco residual conhecido: `mudar123` é pública, então um atacante pode chegar antes do
+profissional e definir a senha. Fechar isso exige senha aleatória no cadastro.
+
+---
+
+## Comandos artisan
+
+| Comando | O que faz |
+|---|---|
+| `ch:conferir-divergencia --mes=` | decompõe a diferença entre CH Solicitada e Relatórios Gerais |
+| `ch:recalcular-planejada [--desde=] [--fix]` | regrava a CH planejada pela agenda, do mês corrente em diante |
+| `glosas:conferir {pasta}` | confere as glosas importadas contra a extração do PDF |
+| `glosas:importar {arquivo} [--competencia=] [--fix] [--substituir]` | importa o relatório de glosas da Unimed e concilia pela guia |
+| `usuarios:revogar-inativos [--fix]` | revoga contas de profissionais já inativados |
+| `usuarios:marcar-senha-padrao [--fix]` | marca contas que ainda usam `mudar123` |
+| `app:send-birthday-emails` | agendado às 08:00; e-mail de aniversariantes ao RH |
+
+Todos com modo diagnóstico por padrão — sem `--fix` apenas simulam.
 
 ---
 
 ## Armadilhas conhecidas
 
 **Blade grudado em palavra.** `Manual@if(...)` não compila a diretiva (exige que não haja
-caractere de palavra antes do `@`), mas o `@endif` compila — sobra `endif` órfão e o parser quebra.
-Sempre separar com espaço ou quebra de linha.
+caractere de palavra antes do arroba), mas o `@endif` compila — sobra `endif` órfão e o parser
+quebra.
 
-**Tailwind com classe dinâmica.** `bg-{$cor}-500` é removido no purge. Gravar a classe por extenso.
+**Tailwind com classe dinâmica.** `bg-{$cor}-500` é removido no purge. Gravar por extenso.
 
 **`wire:model` é adiado no Livewire 3.** Hooks `updated()` só disparam na requisição seguinte.
-Campos que alimentam cálculo em tempo real precisam de `wire:model.live`.
+Campo que alimenta cálculo em tempo real precisa de `wire:model.live`.
 
 **MySQL não faz rollback de DDL.** `ALTER TABLE` commita na hora. Migration deve ser rápida e
-idempotente (`Schema::hasColumn`); operação pesada de dados vai para comando artisan, que pode ser
-interrompido e repetido. Backfill com `Hash::check` numa migration travou o deploy em produção.
+idempotente (`Schema::hasColumn`); operação pesada de dados vai para comando artisan, que pode
+ser interrompido e repetido. Backfill com `Hash::check` numa migration travou o deploy em produção.
 
 **Alias igual a coluna física.** Com `select('tabela.*')`, aliasar uma expressão com o mesmo nome
 de uma coluna existente quebra `fromSub` com "Duplicate column name".
 
 **Tooltip em tabela com `overflow-x-auto`.** O `overflow-y` passa a computar como `auto` e recorta
 elementos posicionados. Usar `title` nativo.
+
+**`whereYear` + `whereMonth` anulam o índice.** Envolver a coluna numa função impede o uso de
+`appointments_appointment_date_index`: `type=ALL`, 57.320 linhas varridas contra 5.672 com
+`where >= inicio AND < fim`. Filtrar competência por intervalo de datas.
+
+**`pluck` com `DB::raw` na chave.** A coluna-chave tem que existir no resultado; com uma
+expressão crua o Laravel procura uma propriedade com o nome do SQL inteiro, avisa
+`Undefined property` e devolve tudo nulo — o gráfico fica zerado sem erro. Dar `as alias` no
+`selectRaw` e usar o alias.
+
+**Índice usado por foreign key não pode ser dropado.** MySQL 1553: a FK se apoia no índice
+cuja coluna dela é a mais à esquerda. Criar o substituto **antes** de remover o antigo.
+
+**`iconv` com `//TRANSLIT` depende do locale.** Neste servidor "DÉBORA CÂMARA" vira
+`D'EBORA C^AMARA`, não `DEBORA CAMARA` — agrupar nomes por essa chave parte a mesma pessoa em
+dois grupos. Usar `Str::ascii()`, que tem tabela própria e resultado estável.
+
+**`Carbon::createFromFormat` lança exceção** quando o formato não casa, em vez de devolver
+`false`. Testar vários formatos em sequência exige `try/catch` em cada tentativa.
+
+**`orWhere` sem agrupamento.** `AND` tem precedência sobre `OR`; sem o closure a pesquisa vaza
+para fora do filtro pretendido.
 
 ---
 
@@ -167,5 +460,17 @@ elementos posicionados. Usar `title` nativo.
 - `Livewire::test()->set()` atribui a propriedade direto no servidor e sempre dispara `updated()`,
   **independente do binding no HTML**. Não serve para validar `wire:model` vs `.live` — isso só
   se confirma na tela.
-- Testes que gravam devem rodar em transação com rollback: a suíte PHPUnit do projeto está
-  quebrada (migrations falham no sqlite) e os testes são feitos via tinker contra o banco local.
+- Testes que gravam devem rodar em transação com rollback: a suíte PHPUnit está quebrada
+  (migrations falham no sqlite) e os testes são feitos via tinker contra o banco local.
+
+---
+
+## Dados sujos conhecidos
+
+- 1 atendimento com data no ano **0202**
+- 4 atendimentos com `check_out` anterior ao `check_in`; ~336 sem `check_out`
+- 1 bloco de agenda com duração negativa
+- Pacientes #492 (unidade) e #299 (convênio) tiveram troca que reescreveu histórico antes da
+  correção; o backfill não reconstrói
+- `professionals.deletion_reason` existe, está no fillable e **nunca é preenchido**
+- Motivo e observação de saída são concatenados num só campo; o bloco "Obs" do Blade é código morto

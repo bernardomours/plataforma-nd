@@ -80,6 +80,12 @@ class Index extends Component
 
     private const SQL_REALIZADA = 'COALESCE(ap.sessoes, 0)';
 
+    // Um paciente pode ter várias requisições complementares para a mesma terapia no mês.
+    // Solicitada/autorizada/planejada somam entre elas; o realizado é o mesmo para todas,
+    // então usa MAX — somar contaria o mesmo atendimento uma vez por requisição.
+    private const AGG_PLANEJADA = 'SUM(' . self::SQL_PLANEJADA . ')';
+    private const AGG_REALIZADA = 'MAX(' . self::SQL_REALIZADA . ')';
+
     private function subqueryRealizado()
     {
         return DB::table('appointments')
@@ -100,14 +106,27 @@ class Index extends Component
     private function baseQuery()
     {
         $query = RequestedService::query()
-            ->select('requested_services.*')
-            ->selectRaw(self::SQL_REALIZADA . ' as realized_sessions')
-            ->selectRaw(self::SQL_PLANEJADA . ' as planned_total')
-            ->selectRaw(self::SQL_PLANEJADA_SEMANAL . ' as planned_weekly')
-            ->selectRaw('COALESCE(ap.horas, 0) as realized_hours')
-            ->selectRaw('COALESCE(ap.atendimentos, 0) as realized_appointments')
-            ->with(['patient.unit', 'therapy', 'serviceType'])
-            ->has('patient')
+            ->selectRaw('MIN(requested_services.id) as id')
+            ->selectRaw('requested_services.patient_id, requested_services.therapy_id, requested_services.service_type_id')
+            ->selectRaw('MIN(requested_services.month_year) as month_year')
+            ->selectRaw('COUNT(*) as requisicoes')
+            ->selectRaw("GROUP_CONCAT(DISTINCT requested_services.requisition_number ORDER BY requested_services.requisition_number SEPARATOR ', ') as requisition_number")
+            ->selectRaw('COALESCE(SUM(requested_services.requested_hours), 0) as requested_hours')
+            ->selectRaw('COALESCE(SUM(requested_services.approved_hours), 0) as approved_hours')
+            ->selectRaw(self::AGG_PLANEJADA . ' as planned_total')
+            ->selectRaw('SUM(' . self::SQL_PLANEJADA_SEMANAL . ') as planned_weekly')
+            ->selectRaw(self::AGG_REALIZADA . ' as realized_sessions')
+            ->selectRaw('MAX(COALESCE(ap.horas, 0)) as realized_hours')
+            ->selectRaw('MAX(COALESCE(ap.atendimentos, 0)) as realized_appointments')
+            ->with([
+                'patient' => fn ($q) => $q->withTrashed()->with('unit'),
+                'therapy',
+                'serviceType',
+            ])
+            // Paciente com saída registrada continua contando na competência em que foi
+            // atendido: a alta em agosto não pode apagar o que ele fez em julho. O mês
+            // seguinte se resolve sozinho — ninguém cadastra CH para quem já saiu.
+            ->whereHas('patient', fn ($q) => $q->withTrashed())
             ->leftJoinSub($this->subqueryRealizado(), 'ap', function ($join) {
                 $join->on('ap.patient_id', '=', 'requested_services.patient_id')
                      ->on('ap.therapy_id', '=', 'requested_services.therapy_id')
@@ -118,18 +137,18 @@ class Index extends Component
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->whereHas('patient', function ($subQ) {
-                        $subQ->where('name', 'like', '%' . $this->search . '%');
+                        $subQ->withTrashed()->where('name', 'like', '%' . $this->search . '%');
                     })->orWhere('requisition_number', 'like', '%' . $this->search . '%');
                 });
             })
             ->when($this->unit_id, function ($query) {
                 $query->whereHas('patient', function ($q) {
-                    $q->where('unit_id', $this->unit_id);
+                    $q->withTrashed()->where('unit_id', $this->unit_id);
                 });
             })
             ->when($this->agreement_id, function ($query) {
                 $query->whereHas('patient', function ($q) {
-                    $q->where('agreement_id', $this->agreement_id);
+                    $q->withTrashed()->where('agreement_id', $this->agreement_id);
                 });
             })
             ->when($this->therapy_id, function ($query) {
@@ -140,55 +159,51 @@ class Index extends Component
             })
             ->when($this->month, function ($query) {
                 $query->whereMonth('month_year', $this->month);
-            });
+            })
+            ->groupBy(
+                'requested_services.patient_id',
+                'requested_services.therapy_id',
+                'requested_services.service_type_id',
+                DB::raw('YEAR(requested_services.month_year)'),
+                DB::raw('MONTH(requested_services.month_year)')
+            );
 
         $allowedUnits = auth()->user()->getAllowedUnitIds();
 
         if ($allowedUnits !== null) {
             $query->whereHas('patient', function ($q) use ($allowedUnits) {
-                $q->whereIn('unit_id', $allowedUnits);
+                $q->withTrashed()->whereIn('unit_id', $allowedUnits);
             });
         }
 
         return $query;
     }
 
-    /**
-     * Aplica o filtro de faixa. Fica separado da baseQuery porque o painel de faixas
-     * precisa contar o universo INTEIRO — se a faixa entrasse na base, os cartões
-     * passariam a contar apenas a própria faixa selecionada.
-     */
     private function aplicarFiltroFaixa($query)
     {
         if (! $this->faixa) {
             return $query;
         }
 
-        $planejada = self::SQL_PLANEJADA;
-        $realizada = self::SQL_REALIZADA;
+        // HAVING e não WHERE: depois do agrupamento a comparação é entre agregados.
+        $planejada = self::AGG_PLANEJADA;
+        $realizada = self::AGG_REALIZADA;
 
         if ($this->faixa === 'sem_plano') {
-            return $query->whereRaw("{$planejada} <= 0");
+            return $query->havingRaw("{$planejada} <= 0");
         }
 
-        $query->whereRaw("{$planejada} > 0");
+        $query->havingRaw("{$planejada} > 0");
 
         return match ($this->faixa) {
-            'cumprida' => $query->whereRaw("{$realizada} >= {$planejada}"),
-            'atencao'  => $query->whereRaw("{$realizada} < {$planejada} AND {$realizada} >= 0.8 * {$planejada}"),
-            'critico'  => $query->whereRaw("{$realizada} < 0.8 * {$planejada} AND {$realizada} >= 0.5 * {$planejada}"),
-            'grave'    => $query->whereRaw("{$realizada} < 0.5 * {$planejada}"),
+            'cumprida' => $query->havingRaw("{$realizada} >= {$planejada}"),
+            'atencao'  => $query->havingRaw("{$realizada} < {$planejada} AND {$realizada} >= 0.8 * {$planejada}"),
+            'critico'  => $query->havingRaw("{$realizada} < 0.8 * {$planejada} AND {$realizada} >= 0.5 * {$planejada}"),
+            'grave'    => $query->havingRaw("{$realizada} < 0.5 * {$planejada}"),
             default    => $query,
         };
     }
 
-    /**
-     * Todos os totais em UMA consulta.
-     *
-     * Antes eram quatro idas ao banco — três SUM e um ->get()->sum('realized_hours'),
-     * este último trazendo TODAS as linhas do filtro para a memória do PHP só para somar
-     * uma coluna. Agora envolvemos a consulta base numa derivada e agregamos no MySQL.
-     */
     private function estatisticas(): object
     {
         $planejada = 'planned_total';
@@ -219,8 +234,6 @@ class Index extends Component
             ")
             ->first();
 
-        // Percentual de aderência: comparado apenas contra o que TEM planejamento
-        // informado, senão registros sem plano derrubariam o indicador artificialmente.
         $stats->aderencia = $stats->planejadas > 0
             ? round(($stats->realizadas_com_plano / $stats->planejadas) * 100, 1)
             : null;
@@ -251,9 +264,6 @@ class Index extends Component
     public function updatedYear() { $this->resetPage(); }
     public function updatedSearch() { $this->resetPage(); }
 
-    // CORREÇÃO: o hook antigo chamava-se updatedAgreement(), mas a propriedade é
-    // $agreement_id — o Livewire monta o nome a partir da propriedade, então o método
-    // nunca era chamado e trocar o convênio não voltava para a primeira página.
     public function updatedAgreementId() { $this->resetPage(); }
 
     public function updatedTherapyId() { $this->resetPage(); }
@@ -278,10 +288,6 @@ class Index extends Component
         return ($negativo ? '-' : '') . sprintf('%02d:%02d', $hours, $minutes);
     }
 
-    /**
-     * Aderência de uma linha, em percentual. null quando não há planejamento informado.
-     * Compara SESSÕES realizadas contra SESSÕES planejadas no mês (semanal x 4).
-     */
     public function aderenciaDaLinha($registro): ?float
     {
         $planejada = (float) ($registro->planned_total ?? 0);
@@ -293,13 +299,11 @@ class Index extends Component
         return round(((float) $registro->realized_sessions / $planejada) * 100, 1);
     }
 
-    /** Sessões planejadas no mês para a linha (o campo do banco é semanal). */
     public function planejadasNoMes($registro): float
     {
         return (float) ($registro->planned_total ?? 0);
     }
 
-    /** Sessões que faltaram. null quando não há planejamento informado. */
     public function faltaDaLinha($registro): ?float
     {
         $planejada = $this->planejadasNoMes($registro);
@@ -332,7 +336,7 @@ class Index extends Component
         $stats = $this->estatisticas();
 
         $registros = $this->aplicarFiltroFaixa($this->baseQuery())
-            ->orderBy('month_year', 'desc')
+            ->orderByRaw('MIN(requested_services.month_year) DESC')
             ->paginate(15);
 
         return view('livewire.ch-solicitada.index', [

@@ -56,8 +56,9 @@ class Index extends Component
 
         $user = auth()->user();
 
-        if (in_array($user->role, ['coordinator', 'supervisor'])) {
-            
+        // Coordenador e supervisor veem apenas as próprias visitas.
+        if ($user->hasAnyRole(['coordinator', 'supervisor'])) {
+
             $profissional = Professional::where('user_id', $user->id)->first();
             
             if ($profissional) {
@@ -85,7 +86,7 @@ class Index extends Component
         
         $user = auth()->user();
 
-        if (in_array($user->role, ['coordinator', 'supervisor'])) {
+        if ($user->hasAnyRole(['coordinator', 'supervisor'])) {
             $profissional = Professional::where('user_id', $user->id)->first();
             $this->profissional_id = $profissional ? $profissional->id : '';
         } else {

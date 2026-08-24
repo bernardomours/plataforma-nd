@@ -13,19 +13,12 @@
                 </div>
             </div>
 
-            <!-- ========================================== -->
-            <!-- 1. ALERTAS (Coordenação, Supervisão e Gestão) -->
-            <!-- ========================================== -->
             @hasanyrole('admin|manager|administrative|coordinator|supervisor')
                 <div>
                     <livewire:dashboard.alertas-pendentes />
                 </div>
             @endhasanyrole
 
-
-            <!-- ========================================== -->
-            <!-- 2. VISÃO GLOBAL DA CLÍNICA (Apenas Gestão) -->
-            <!-- ========================================== -->
             @hasanyrole('admin|manager|administrative')
                 <div>
                     <div class="mb-3">
@@ -33,16 +26,11 @@
                     </div>
                     
                     <div class="grid grid-cols-1 gap-6">
-                        <!-- Aniversariantes Globais (Toda a clínica) -->
                         <livewire:dashboard.aniversariantes />
                     </div>
                 </div>
             @endhasanyrole
 
-
-            <!-- ========================================== -->
-            <!-- 3. AMBIENTE DO PROFISSIONAL (Terapeutas) -->
-            <!-- ========================================== -->
             @role('profissional')
                 <div>
                     <div class="mb-3">

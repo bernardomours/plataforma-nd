@@ -32,10 +32,14 @@ class Geral extends Component
 
     public function mount()
     {
-        if (!in_array(auth()->user()->role, ['admin', 'manager'])) {
-                abort(403, 'Acesso não autorizado.');
-            }        $this->mes = now()->month;
-            
+        // Papel pelo Spatie, não pela coluna users.role (legado, congelada desde 04/2026).
+        // A checagem aqui não é redundante com o middleware da rota: as ações do Livewire
+        // vão para livewire/update, que não reexecuta o middleware da rota original.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Acesso não autorizado.');
+        }
+
+        $this->mes = now()->month;
         $this->ano = now()->year;
 
         for ($i = 0; $i <= 5; $i++) {

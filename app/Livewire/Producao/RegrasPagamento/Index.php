@@ -9,7 +9,9 @@ use App\Models\ProfessionalPaymentRule;
 use App\Models\Professional;
 use App\Models\Therapy;
 use App\Models\Agreement;
-use App\Models\ServiceType; // <-- Model de Ambiente importado
+use App\Models\ServiceType;
+use App\Models\Unit;
+use Illuminate\Support\Facades\DB;
 
 #[Layout('layouts.producao')]
 class Index extends Component
@@ -18,6 +20,9 @@ class Index extends Component
 
     public $modalAberto = false;
     public $modalExclusaoAberto = false;
+
+    public string $busca = '';
+    public $unidade_id = '';
 
     public $regra_id = null;
     public $professional_id = '';
@@ -58,6 +63,22 @@ class Index extends Component
         $this->terapias = Therapy::orderBy('name')->get();
         $this->convenios = Agreement::orderBy('name')->get();
         $this->ambientes = ServiceType::orderBy('name')->get(); // <-- Carregando lista do banco
+    }
+
+    public function updatingBusca()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingUnidadeId()
+    {
+        $this->resetPage();
+    }
+
+    public function limparFiltros()
+    {
+        $this->reset(['busca', 'unidade_id']);
+        $this->resetPage();
     }
 
     public function abrirModalCriar()
@@ -129,12 +150,36 @@ class Index extends Component
 
     public function render()
     {
-        $regras = ProfessionalPaymentRule::with(['professional', 'therapy', 'agreement', 'serviceType'])
-            ->orderBy('id', 'desc')
+        // Ordena por subconsulta em vez de join: 3 regras pertencem a profissionais inativados
+        // e um join com `professionals` faria essas linhas sumirem da tela.
+        $nomeDoProfissional = Professional::withTrashed()
+            ->select('name')
+            ->whereColumn('professionals.id', 'professional_payment_rules.professional_id');
+
+        $regras = ProfessionalPaymentRule::query()
+            ->with([
+                'professional' => fn ($q) => $q->withTrashed(),
+                'therapy', 'agreement', 'serviceType',
+            ])
+            ->when($this->busca !== '', function ($q) {
+                // Curingas do LIKE precisam ser neutralizados: sem isso "%" casa com tudo.
+                $termo = '%' . str_replace(['%', '_'], ['\%', '\_'], trim($this->busca)) . '%';
+
+                $q->whereIn('professional_id', Professional::withTrashed()
+                    ->where('name', 'like', $termo)
+                    ->select('id'));
+            })
+            ->when($this->unidade_id, fn ($q) => $q->whereIn('professional_id',
+                DB::table('professional_unit')
+                    ->where('unit_id', $this->unidade_id)
+                    ->select('professional_id')))
+            ->orderBy($nomeDoProfissional)
+            ->orderBy('id')
             ->paginate(10);
 
         return view('livewire.producao.regras-pagamento.index', [
-            'regras' => $regras,
+            'regras'        => $regras,
+            'unidadesLista' => Unit::orderBy('name')->get(),
         ]);
     }
 }

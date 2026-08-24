@@ -261,9 +261,13 @@ new class extends Component
                         {{ __('Meu Perfil') }}
                     </x-dropdown-link>
 
-                    <x-dropdown-link :href="url('/producao')">
-                        {{ __('Área de Produção') }}
-                    </x-dropdown-link>
+                    {{-- Mesma condição do middleware CheckProductionAccess: quem não pode
+                         entrar também não vê o atalho. --}}
+                    @if(auth()->user()->can_access_production)
+                        <x-dropdown-link :href="url('/producao')">
+                            {{ __('Área de Produção') }}
+                        </x-dropdown-link>
+                    @endif
 
                     <button wire:click="logout" class="w-full text-start">
                         <x-dropdown-link>
