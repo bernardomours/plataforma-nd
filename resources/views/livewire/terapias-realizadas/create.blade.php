@@ -10,10 +10,10 @@
                     <ol class="inline-flex items-center space-x-1">
                         <li><a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="hover:text-blue-600 transition-colors">Terapias Realizadas</a></li>
                         <li><span class="mx-1 text-gray-400">/</span></li>
-                        <li aria-current="page" class="text-gray-700 font-medium">Registrar Consulta</li>
+                        <li aria-current="page" class="text-gray-700 font-medium">Registrar Atendimento</li>
                     </ol>
                 </nav>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Registrar Consulta</h2>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Registrar Atendimento</h2>
             </div>
         </div>
     </x-slot>
@@ -149,7 +149,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da Consulta <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data do Atendimento <span class="text-red-500">*</span></label>
                     <input type="date" wire:model="appointment_date" 
                         class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 {{ $data_rapida !== 'outro' ? 'bg-gray-100 cursor-not-allowed text-gray-500' : '' }}" 
                         {{ $data_rapida !== 'outro' ? 'readonly' : '' }}>
@@ -210,7 +210,7 @@
 
             <div class="flex items-center justify-start gap-3 pt-6 border-t border-gray-200">
                 <button type="submit" class="px-5 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-blue-700 flex items-center gap-2">
-                    <span wire:loading.remove wire:target="save">Registrar Consulta</span>
+                    <span wire:loading.remove wire:target="save">Registrar Atendimento</span>
                     <span wire:loading wire:target="save">Registrando...</span>
                 </button>
                 <button type="button" wire:click="saveAndCreateAnother" class="px-5 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2">

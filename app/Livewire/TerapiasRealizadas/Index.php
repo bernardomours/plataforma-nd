@@ -214,6 +214,13 @@ class Index extends Component
 
     public function exportPdf()
     {
+        // SEGURANÇA: a tela só mostra este botão para admin|manager, mas a ação do
+        // Livewire não passa pelo middleware da rota — sem esta checagem, qualquer
+        // usuário autenticado podia disparar o método direto e baixar o relatório.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para exportar relatórios.');
+        }
+
         $appointments = $this->buildQuery()->get();
 
         $totalConsultas = $appointments->count();
@@ -235,6 +242,14 @@ class Index extends Component
 
     public function deleteAppointment($id)
     {
+        // SEGURANÇA: a coluna "Ações" só aparece para admin|manager|administrative.
+        // Sem esta checagem, um profissional podia chamar o método direto e excluir
+        // qualquer atendimento da própria unidade — o teste de unidade abaixo não
+        // bloqueia isso, porque ele também é o dono da sua unidade.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para excluir atendimentos.');
+        }
+
         // SEGURANÇA (IDOR): Appointment não tem unit_id nem global scope. Sem esta
         // checagem, um ID no payload do Livewire permitia excluir o atendimento de um
         // paciente de outra clínica. A unidade vem do paciente vinculado.
@@ -257,6 +272,12 @@ class Index extends Component
 
     public function exportExcel()
     {
+        // SEGURANÇA: mesmo caso do exportPdf — a ação do Livewire não passa pelo
+        // middleware da rota, então o botão escondido na tela não basta sozinho.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para exportar relatórios.');
+        }
+
         // 1. Executa a query aplicando as mesmas regras de filtragem e unidade permitida
         $atendimentos = $this->buildQuery()->get();
 
@@ -354,6 +375,15 @@ class Index extends Component
 
     public function processImport()
     {
+        // SEGURANÇA: o modal só é aberto pelo botão "Importar CSV", visível apenas para
+        // admin|manager, mas o HTML do modal fica sempre no DOM (só escondido por
+        // x-show) e o wire:submit não passa pelo middleware da rota. Sem esta checagem,
+        // qualquer usuário autenticado podia forjar a chamada e gravar atendimentos em
+        // massa cruzando pacientes/profissionais.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para importar atendimentos.');
+        }
+
         // 1. Validação do formulário
         $this->validate();
         

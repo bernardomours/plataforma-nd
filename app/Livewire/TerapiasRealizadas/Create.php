@@ -250,14 +250,14 @@ class Create extends Component
     public function save()
     {
         $this->performSave();
-        session()->flash('message', 'Consulta registrada com sucesso!');
+        session()->flash('message', 'Atendimento registrado com sucesso!');
         return redirect()->route('terapias-realizadas.index');
     }
 
     public function saveAndCreateAnother()
     {
         $this->performSave();
-        session()->flash('message', 'Consulta registrada com sucesso!');
+        session()->flash('message', 'Atendimento registrado com sucesso!');
         
         $this->reset([
             'patient_id', 'therapy_id', 'service_type_id',

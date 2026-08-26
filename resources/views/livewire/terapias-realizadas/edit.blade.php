@@ -10,10 +10,10 @@
                     <ol class="inline-flex items-center space-x-1">
                         <li><a href="{{ route('terapias-realizadas.index') }}" wire:navigate class="hover:text-blue-600 transition-colors">Terapias Realizadas</a></li>
                         <li><span class="mx-1 text-gray-400">/</span></li>
-                        <li aria-current="page" class="text-gray-700 font-medium">Editar Consulta</li>
+                        <li aria-current="page" class="text-gray-700 font-medium">Editar Atendimento</li>
                     </ol>
                 </nav>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Editar Consulta</h2>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Editar Atendimento</h2>
             </div>
         </div>
     </x-slot>
@@ -131,7 +131,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da Consulta <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data do Atendimento <span class="text-red-500">*</span></label>
                     <input type="date" wire:model="appointment_date" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 {{ $data_rapida !== 'outro' ? 'bg-gray-100 cursor-not-allowed text-gray-500' : '' }}" {{ $data_rapida !== 'outro' ? 'readonly' : '' }}>
                     @error('appointment_date') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>

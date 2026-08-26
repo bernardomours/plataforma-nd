@@ -1,7 +1,7 @@
+@import 'tom-select/dist/css/tom-select.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import 'tom-select/dist/css/tom-select.css';
 
 /* x-cloak é usado em várias telas (login, notificações do prontuário), mas não tinha
    regra CSS definida — o elemento aparecia por um instante antes do Alpine inicializar.
@@ -9,3 +9,81 @@
 [x-cloak] {
     display: none !important;
 }
+
+/* Sistema de tokens compartilhado (nd-ui). Nasceu nos Relatórios Gerais e virou
+   reutilizável para não repetir o mesmo <style> em cada tela nova. Escopado sob
+   .nd-ui para não vazar nos componentes antigos do sistema. */
+.nd-ui {
+    --ink: #111a26;
+    --ink-2: #55616f;
+    --ink-3: #8d98a6;
+    --line: #e4e9ef;
+    --line-2: #d7dde4;
+    --surface: #ffffff;
+    --surface-2: #fafbfc;
+    --accent: #2a78d6;
+    --accent-strong: #1e5fac;
+    --accent-soft: #eef4fc;
+    --danger: #dc2626;
+    --danger-strong: #b91c1c;
+    --danger-soft: #fef2f2;
+}
+.nd-ui .nd-num { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.nd-ui .nd-eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-3);
+}
+.nd-ui .nd-title { font-weight: 700; letter-spacing: -0.011em; color: var(--ink); }
+.nd-ui .nd-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+.nd-ui :focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .nd-ui * { transition: none !important; animation: none !important; }
+}
+
+/* Controles de formulário e botões reutilizáveis do nd-ui. O plugin @tailwindcss/forms
+   só normaliza a aparência nativa (remove estilo do navegador); quem desenha borda,
+   padding e foco é este bloco — sem ele os campos ficam sem contorno visível.
+
+   O padding horizontal fica de fora de propósito: ".nd-ui .nd-input" tem duas classes
+   combinadas (especificidade 0,2,0), que vence uma utilidade do Tailwind como "pl-9"
+   (0,1,0) mesmo vindo depois no CSS — foi o que quebrou o ícone da busca, sobrepondo
+   texto e lupa. Cada input define o próprio px-3/pl-9 via Tailwind; esta classe só
+   cuida do que não muda de instância para instância. */
+.nd-ui .nd-input,
+.nd-ui .nd-select {
+    display: block;
+    width: 100%;
+    min-height: 38px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background-color: #fff;
+    color: var(--ink);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.nd-ui .nd-input::placeholder { color: var(--ink-3); }
+.nd-ui .nd-input:focus,
+.nd-ui .nd-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+}
+
+.nd-ui .nd-btn-primary {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+}
+.nd-ui .nd-btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+
+.nd-ui .nd-btn-ghost {
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--ink);
+}
+.nd-ui .nd-btn-ghost:hover { background: var(--surface-2); border-color: var(--line-2); }

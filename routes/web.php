@@ -96,8 +96,11 @@ Route::middleware(['auth', 'producao.access'])->prefix('producao')->group(functi
     Route::get('/fechamento', ProducaoFechamento::class)->name('producao.fechamento');
     Route::get('/regras-pagamento', RegrasPagamentoIndex::class)->name('producao.regras');
     Route::get('/auditoria-atendimentos', AtendimentosIndex::class)->name('producao.auditoria');
-    Route::get('/glosas', GlosasIndex::class)->name('producao.glosas');
-    
+
+    Route::middleware('role:admin|manager')->group(function () {
+        Route::get('/glosas', GlosasIndex::class)->name('producao.glosas');
+    });
+
     Route::post('/sair', function (Request $request) {
         Auth::logout();
         $request->session()->invalidate();

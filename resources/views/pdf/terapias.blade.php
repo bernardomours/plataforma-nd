@@ -41,7 +41,7 @@
     </header>
 
     <div class="summary-box">
-        <span>Total de Consultas:</span> {{ $totalConsultas }} <br>
+        <span>Total de Atendimentos:</span> {{ $totalConsultas }} <br>
         <span>Total de Sessões:</span> {{ $totalSessoes }}
     </div>
 

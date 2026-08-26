@@ -262,10 +262,6 @@ class Index extends Component
             . ($acessoDevolvido ? ' Acesso ao sistema restaurado.' : ''));
     }
 
-    // ==========================================
-    // RENDERIZAÇÃO E CONSULTAS
-    // ==========================================
-
     private function getProfessionalsQuery()
     {
         $query = Professional::with(['therapies', 'units']);
@@ -313,7 +309,6 @@ class Index extends Component
     {
         $query = $this->getProfessionalsQuery();
         
-        // Passamos a variável $this->perPage em vez do 10 fixo!
         $profissionais = $query->orderBy($this->sortField, $this->sortDirection)->paginate($this->perPage);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();

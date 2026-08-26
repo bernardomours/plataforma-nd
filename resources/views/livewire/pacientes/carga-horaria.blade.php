@@ -258,18 +258,33 @@
                                                     ->implode(PHP_EOL);
                                             @endphp
 
+                                            @php
+                                                // A agenda pode ter sido completada DEPOIS da CH ter sido congelada
+                                                // (planned_from_schedule=false gravado com o valor de então). Nesse
+                                                // caso agenda_mensal — carregado só na edição, ver carregarBlocosDaAgenda
+                                                // — já teria o número certo; falta oferecer um jeito de aplicá-lo.
+                                                $agendaMudouDesdeOCongelamento = ! ($linha['planned_from_schedule'] ?? false)
+                                                    && ($linha['agenda_mensal'] ?? null) !== null
+                                                    && (int) $linha['agenda_mensal'] !== (int) ($linha['planned_sessions'] ?: 0);
+                                            @endphp
+
                                             @if($linha['planned_from_schedule'] ?? false)
                                                 <p class="mt-1 flex items-center gap-1 text-[11px] text-green-700" title="{{ $detalhe }}">
                                                     <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                                     Agenda · <strong>{{ $linha['planned_hours'] }}/sem</strong>
                                                 </p>
+                                            @elseif($agendaMudouDesdeOCongelamento)
+                                                <button type="button" wire:click="usarValorDaAgenda({{ $index }})"
+                                                        class="mt-1 flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:text-blue-900"
+                                                        title="{{ $detalhe ?: 'A agenda foi cadastrada depois desta CH ter sido salva.' }}">
+                                                    <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                                    Agenda agora calcula {{ $linha['agenda_mensal'] }} — clique para usar
+                                                </button>
+                                                @if(!empty($linha['planned_sessions']))
+                                                    <p class="text-[11px] text-amber-700">Valor atual (manual): {{ $linha['planned_sessions'] }}</p>
+                                                @endif
                                             @elseif(!empty($linha['planned_sessions']))
-                                                <p class="mt-1 text-[11px] text-amber-700">
-                                                    Manual
-                                                    @if(!empty($linha['agenda_mensal']))
-                                                        <span class="text-gray-400">(agenda: {{ $linha['agenda_mensal'] }})</span>
-                                                    @endif
-                                                </p>
+                                                <p class="mt-1 text-[11px] text-amber-700">Manual</p>
                                             @elseif(!$temAgenda)
                                                 <p class="mt-1 text-[11px] text-amber-700">Sem agenda cadastrada</p>
                                             @elseif(!empty($linha['therapy_id']) && !empty($linha['service_type_id']))

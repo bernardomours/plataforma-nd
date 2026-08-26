@@ -43,10 +43,11 @@ class RecalculatePlannedSessions extends Command
         $derivados = 0;
         $limpos    = 0;
         $iguais    = 0;
+        $manuais   = 0;
         $cache     = [];
 
         $query->orderBy('id')->chunkById(200, function ($registros) use (
-            $calc, $aplicar, $barra, &$derivados, &$limpos, &$iguais, &$cache
+            $calc, $aplicar, $barra, &$derivados, &$limpos, &$iguais, &$manuais, &$cache
         ) {
             foreach ($registros as $r) {
                 $barra->advance();
@@ -57,6 +58,16 @@ class RecalculatePlannedSessions extends Command
                 if (! array_key_exists($chave, $cache)) {
                     $paciente = Patient::withoutGlobalScopes()->with('agreement')->find($r->patient_id);
                     $cache[$chave] = $paciente ? $calc->paraPaciente($paciente, $competencia) : [];
+                }
+
+                // Protege exceção manual: linha sem planned_from_schedule mas com um
+                // valor já preenchido foi digitada de propósito (ex.: convênio autorizou
+                // menos sessões do que a agenda comporta) — --fix não deve apagar isso
+                // silenciosamente. Mesma regra do ScheduleObserver.
+                if (! $r->planned_from_schedule && $r->planned_sessions !== null) {
+                    $manuais++;
+
+                    continue;
                 }
 
                 $agenda = $cache[$chave][$r->therapy_id . ':' . $r->service_type_id] ?? null;
@@ -89,6 +100,7 @@ class RecalculatePlannedSessions extends Command
         $this->line("Recalculados pela agenda ..... <fg=green>{$derivados}</>");
         $this->line("Limpos (sem agenda) .......... <fg=yellow>{$limpos}</>");
         $this->line("Já estavam corretos .......... {$iguais}");
+        $this->line("Manuais, preservados ......... <fg=cyan>{$manuais}</>");
 
         if (! $aplicar) {
             $this->newLine();

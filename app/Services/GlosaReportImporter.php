@@ -68,7 +68,6 @@ class GlosaReportImporter
             ];
         }
 
-        // Uma consulta de atendimentos para o arquivo inteiro, não uma por remessa.
         $this->resolverAtendimentos($remessas);
 
         foreach ($remessas as &$r) {

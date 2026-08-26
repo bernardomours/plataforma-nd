@@ -8,7 +8,8 @@
         <title>Plataforma ND</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link rel="icon" href="{{ asset('images/logo-site.png') }}" type="image/png">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        {{-- 700/800 entram para o display dos relatórios; nada mais no sistema os usa ainda. --}}
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">

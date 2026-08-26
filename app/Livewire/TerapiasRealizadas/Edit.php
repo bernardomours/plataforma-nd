@@ -247,7 +247,7 @@ class Edit extends Component
             'unit_id' => $this->unit_id,
         ]);
 
-        session()->flash('message', 'Consulta atualizada com sucesso!');
+        session()->flash('message', 'Atendimento atualizado com sucesso!');
         return redirect()->route('terapias-realizadas.index');
     }
 

@@ -14,9 +14,10 @@
                 </div>
             </div>
             
-            <button wire:click="deleteAssessment" wire:confirm="Tem certeza que deseja excluir esta avaliação inteira?" class="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm">
-                Excluir
-            </button>
+            {{-- O botão de excluir NÃO pode ficar aqui: o layout renderiza este x-slot dentro
+                 de <header>, irmão do <main> que contém a raiz wire:id. Fora da raiz, o
+                 Livewire não liga o wire:click e o clique não faz nada. Ele está na barra de
+                 ações, dentro do corpo do componente. --}}
         </div>
     </x-slot>
 
@@ -74,13 +75,21 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <button wire:click="updateAssessment" class="px-5 py-2.5 bg-blue-400 text-white rounded-lg font-bold shadow-sm hover:bg-blue-500 transition-colors">
+        <div class="flex flex-wrap items-center gap-3">
+            <button wire:click="updateAssessment" wire:loading.attr="disabled" wire:target="updateAssessment"
+                    class="px-5 py-2.5 bg-blue-400 text-white rounded-lg font-bold shadow-sm hover:bg-blue-500 transition-colors disabled:opacity-60">
                 Salvar alterações
             </button>
             <a href="{{ route('avaliacoes-neuro.index') }}" wire:navigate class="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors">
                 Cancelar
             </a>
+
+            <button wire:click="deleteAssessment"
+                    wire:confirm="Excluir esta avaliação e todas as {{ $assessment->sessions()->count() }} sessões do diário? Não há como desfazer."
+                    wire:loading.attr="disabled" wire:target="deleteAssessment"
+                    class="ml-auto px-5 py-2.5 bg-white border border-red-300 text-red-700 rounded-lg font-bold hover:bg-red-50 transition-colors disabled:opacity-60">
+                Excluir avaliação
+            </button>
         </div>
 
         <div class="bg-white shadow-sm sm:rounded-xl border border-gray-200 mt-8">

@@ -227,6 +227,22 @@ class CargaHoraria extends Component
     }
 
     /**
+     * Aplica o valor que a agenda calcula HOJE, sob demanda.
+     *
+     * O único gatilho automático de preencherPelaAgenda() é trocar terapia/tipo — editar
+     * um registro existente sem mexer nesses campos nunca dispara updated(), então uma CH
+     * congelada como "sem agenda" continua assim para sempre mesmo depois de alguém montar
+     * o horário do paciente. Foi o caso de campo que motivou este botão: o coordenador
+     * cadastrou a agenda de ABA depois que a CH tinha sido salva sem ela, e não existia
+     * como pedir para a tela conferir de novo sem editar terapia e tipo (o que reseta a
+     * seleção) ou rodar `ch:recalcular-planejada` por SSH.
+     */
+    public function usarValorDaAgenda(int $indice): void
+    {
+        $this->preencherPelaAgenda($indice);
+    }
+
+    /**
      * Pre-preenche a linha com o que a agenda indica para a competencia escolhida.
      * Nao mexe em nada quando a combinacao terapia+tipo nao existe na agenda: o campo
      * segue manual e a tela avisa.

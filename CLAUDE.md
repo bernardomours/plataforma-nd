@@ -121,6 +121,38 @@ nos dois sentidos.
 **Congelamento:** ao salvar a CH, `planned_sessions` é gravado e não muda mais. Alterar a agenda
 depois não reescreve competência fechada; a tela mostra a divergência sem aplicá-la.
 
+**`ScheduleObserver` mantém a CH em dia sozinho, para o mês vigente.** Criar, editar ou
+excluir um horário na agenda (`schedules`) dispara o observer, que recalcula
+`planned_sessions`/`planned_hours` do paciente para toda competência com `month_year >=`
+início do mês atual — o mesmo corte do `ch:recalcular-planejada`. Mês fechado não é tocado por
+nenhum dos dois: quando o calendário vira, a competência anterior sai do filtro sozinha e o
+último valor gravado fica definitivo, sem precisar de lógica extra para "fechar o mês".
+
+Registrado em `AppServiceProvider::boot()`, no mesmo padrão de `AppointmentObserver`/
+`VisitObserver`. Só reage a mudança nos campos que afetam o cálculo (dia, horário, terapia,
+tipo, paciente, bloqueio) — trocar o profissional de um bloco não recalcula nada. Trocar o
+`patient_id` de um bloco recalcula os dois pacientes envolvidos, não só o atual.
+
+**Nem o observer nem `--fix` sobrescrevem CH marcada como Manual.** Uma linha com
+`planned_from_schedule = false` e um valor já preenchido foi digitada de propósito — convênio
+autorizou menos sessões do que a agenda comporta, por exemplo. Antes dessa proteção, rodar
+`--fix` (ou, com o observer, só editar QUALQUER horário do mesmo paciente) apagava essa decisão
+silenciosamente, sem o autor saber; testado e confirmado antes da correção. O comando agora
+reporta "Manuais, preservados" com a contagem de quantas linhas pulou por esse motivo — na base
+local, 49.
+
+**A CH não se atualiza sozinha quando a agenda é completada depois.** `preencherPelaAgenda()`
+só é chamado quando o usuário troca terapia/tipo/mês no formulário — abrir "Editar" num
+registro já congelado e salvar sem tocar nesses campos nunca dispara `updated()`, então uma
+CH que ficou "sem agenda" continua assim para sempre, mesmo depois de alguém montar o horário
+do paciente. Foi o caso real que motivou o botão "Agenda agora calcula X — clique para usar"
+em `Pacientes\CargaHoraria`: a coordenação cadastra a CH antes de fechar a grade de horários
+(comum em ABA, que costuma vir depois), e sem esse botão o único jeito de reconciliar era
+editar terapia e tipo de novo (o que reseta a seleção) ou pedir para alguém rodar
+`ch:recalcular-planejada` por SSH. O botão só aparece quando `agenda_mensal` (calculado ao
+abrir a edição, sem sobrescrever nada) diverge do valor gravado — não aparece se os dois já
+batem, nem se a linha já é `planned_from_schedule = true`.
+
 O campo continua editável: sobrescrever marca `planned_from_schedule = false` e a tela exibe
 "Manual". É a saída para exceções, e deixa rastreável quem fugiu do padrão.
 
@@ -223,6 +255,22 @@ O pipeline converte PDF+XLS em CSV e deixa em
 `--competencia=AAAA-MM` filtra **na leitura**. Sem ele, o consolidado inteiro consome ~550 MB
 de pico e não passa em hospedagem compartilhada; com ele, 146 MB. É assim que se importa o mês
 novo: apontar para o consolidado e filtrar, sem precisar fatiar o arquivo antes.
+
+**Rotina mensal (em produção desde 24/08/2026).** Os arquivos ficam no servidor em
+`storage/app/glosas/` (o consolidado, que é o que se importa) e `storage/app/glosas_pdf/` (os
+CSV por competência, que só servem para conferir). As duas pastas não são alcançáveis pela web
+— o domínio aponta para `public/` — e o `.gitignore` de `storage/app` já as cobre.
+
+Quando chega a competência nova: substituir o consolidado, acrescentar os dois CSV do PDF, e
+
+```
+php artisan glosas:importar storage/app/glosas/unimed__demonstrativo_producao_xls.csv --competencia=AAAA-MM
+php artisan glosas:importar ... --competencia=AAAA-MM --fix     # depois de conferir a simulação
+php artisan glosas:conferir storage/app/glosas_pdf
+```
+
+Reemissão da Unimed exige `--substituir`: a remessa antiga é apagada em cascata e regravada.
+O laço é seguro de repetir — competência já gravada é bloqueada, não duplica.
 
 Três tabelas — `glosa_batches` (remessa), `glosa_items` (linha) e `glosa_reasons` (motivos) —
 mais o catálogo `glosa_reason_codes`. Fica **fora de `appointments`** de propósito: o relatório
@@ -331,6 +379,61 @@ correspondente; clicar de novo na mesma limpa.
 apresentado 180, glosa 180 e liberado 180 ao mesmo tempo, e duas em 07/2026 onde o convênio
 liberou 136 tendo sido apresentados 130. O comando avisa e não corrige: o erro é do relatório.
 
+### Sistema de tokens `nd-ui`
+
+Nasceu nos Relatórios Gerais como `<style>` local (`.nd-relatorios`) e virou classe
+compartilhada em `resources/css/app.css` (`.nd-ui`) para não repetir o mesmo bloco em cada
+tela redesenhada. Primeira reutilização: `Terapias Realizadas`. Cores, espaçamento e a
+tipografia (`nd-eyebrow`, `nd-title`, `nd-num` para números tabulares) ficam em variáveis CSS
+dentro do escopo `.nd-ui`, então nada vaza para o resto do sistema — uma tela só adota o
+padrão novo envolvendo o componente em `<div class="nd-ui">`.
+
+`@tailwindcss/forms` só remove a aparência nativa do navegador; quem desenha borda, padding
+e o anel de foco dos campos são as classes `.nd-input`/`.nd-select`/`.nd-btn-primary`/
+`.nd-btn-ghost` do mesmo arquivo — sem elas, um `<select>` sem outras classes Tailwind fica
+sem contorno visível.
+
+### Relatórios Gerais: cor, tipo e a fita do mês
+
+`Relatorios\Geral` tem três abas — geral, comparativo e **frequência e ocupação** — todas sob
+os mesmos filtros. A de ocupação sai de `HOUR(check_in)` numa consulta agregada só; os quatro
+painéis são recortes dela em PHP, para não divergirem entre si.
+
+**Todo quantitativo do sistema soma `session_number`, nunca conta atendimentos.** A sessão é o
+que vale para faturamento e para a CH, e a razão varia muito por unidade: em agosto/2026 Natal
+teve 1,75 sessão por atendimento e Mossoró 2,03, contra 1,00 em João Câmara e Santa Cruz —
+contar atendimento subestimaria justamente as duas unidades que faturam Unimed. `COUNT(*)` só
+aparece como métrica secundária, rotulada como "registros lançados".
+
+Cuidado com rótulo: os rankings por terapia, unidade e convênio somam `session_number` desde
+sempre, mas se chamavam "Ranking de Atendimentos". Título e nome de série têm que dizer
+**Sessões** quando é isso que está no eixo.
+
+**Regra de cor.** Ranking de série única (terapia, unidade, convênio, beneficiários) usa **uma
+cor só** — a categoria já está no eixo, e pintar cada barra de um jeito não codifica nada. A
+paleta categórica só entra onde há mais de uma série no mesmo gráfico. Ela é validada para
+daltonismo (pior par adjacente ΔE 9,1) e tem 8 posições, na ordem:
+
+```
+#2a78d6  #eb6834  #1baf7a  #eda100  #e87ba4  #008300  #4a3aa7  #e34948
+```
+
+São 12 terapias para 8 posições, então o empilhado por dia da semana tem **teto de 7 séries +
+"Outras"**. Sem o teto o ApexCharts recicla cor e duas terapias viram a mesma — era o que
+acontecia com o array de 6 cores que existia antes. Nunca acrescentar uma nona cor.
+
+`distributed: true` no ApexCharts pinta cada barra de uma cor: só usar quando a cor carregar
+significado próprio, o que num ranking não é o caso.
+
+**A fita do mês** é o elemento de destaque da aba geral: cada dia do mês vira uma barra, fins
+de semana entram esmaecidos e dias sem lançamento aparecem como traço. Ela substituiu quatro
+cards de KPI mais um gráfico de "Sessões por Dia" que repetia a mesma série. As iniciais dos
+dias somem abaixo de `sm` — a 5px de largura não se leem.
+
+Os tokens da página vivem num `<style>` com escopo `.nd-relatorios`, então nada vaza para o
+resto do sistema. A fonte é a Figtree que já era do projeto, com 700/800 acrescentados ao link
+do `layouts/app` para o display; nenhuma outra tela usa esses pesos ainda.
+
 ## Por que CH Solicitada e Relatórios Gerais divergem
 
 São perguntas diferentes, não erro de cálculo. `Relatorios\Geral` faz `Appointment::query()`
@@ -413,6 +516,14 @@ Todos com modo diagnóstico por padrão — sem `--fix` apenas simulam.
 **Blade grudado em palavra.** `Manual@if(...)` não compila a diretiva (exige que não haja
 caractere de palavra antes do arroba), mas o `@endif` compila — sobra `endif` órfão e o parser
 quebra.
+
+**`wire:click` dentro de `<x-slot name="header">` não funciona.** O `layouts.app` renderiza
+esse slot dentro de `<header>`, que é **irmão** do `<main>{{ $slot }}</main>` onde fica a raiz
+`wire:id` do componente. O Livewire só liga diretivas dentro da própria raiz, então o botão
+aparece na tela mas o clique não dispara nada — sem erro, sem requisição. Foi o bug do
+"Excluir" da Avaliação Neuro. Ação interativa vai no corpo do componente, nunca no slot de
+layout. Não confundir com `x-slot` de componente Blade usado inline (`<x-dropdown>`), que
+renderiza no mesmo ponto e funciona normalmente.
 
 **Tailwind com classe dinâmica.** `bg-{$cor}-500` é removido no purge. Gravar por extenso.
 

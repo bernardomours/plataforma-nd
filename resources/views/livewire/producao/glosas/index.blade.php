@@ -94,10 +94,9 @@
                 <p class="mt-2 text-xs text-rose-700">{{ $num($kpis['glosados']) }} itens recusados</p>
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Valor Liberado</h3>
+            <div class="rounded-xl border border-green-400 bg-green-50 p-5 shadow-sm">
+                <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-green-500">Valor Liberado</h3>
                 <p class="text-2xl font-bold text-emerald-600">{{ $moeda($kpis['liberado']) }}</p>
-                <p class="mt-2 text-xs text-gray-400">Efetivamente pago pelo convênio</p>
             </div>
 
             <div class="rounded-xl border p-5 shadow-sm {{ $kpis['percentual'] >= 5 ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white' }}">

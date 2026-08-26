@@ -17,11 +17,9 @@ class Index extends Component
 {
     use WithPagination;
 
-    /** Recorte da página inteira: KPIs, gráfico e rankings respondem a estes dois. */
     public string $competencia = '';
     public $unidade_id = '';
 
-    /** Recorte só da lista, para não produzir KPI sem sentido (ex.: "apresentado do CM89"). */
     public string $codigo = '';
     public string $busca = '';
     public string $situacao = 'glosados';
@@ -70,7 +68,6 @@ class Index extends Component
         $this->detalheId = null;
     }
 
-    /** Recorte da página: competência e unidade. */
     private function escopo()
     {
         return GlosaItem::query()
@@ -78,7 +75,6 @@ class Index extends Component
             ->when($this->unidade_id, fn ($q) => $q->where('unit_id', $this->unidade_id));
     }
 
-    /** Recorte da lista: o escopo da página mais motivo, busca e situação. */
     private function lista()
     {
         return $this->escopo()
@@ -117,7 +113,6 @@ class Index extends Component
         ];
     }
 
-    /** Série histórica: a competência é o eixo, então só a unidade filtra aqui. */
     private function evolucao()
     {
         return GlosaBatch::query()
@@ -165,13 +160,6 @@ class Index extends Component
             ->get();
     }
 
-    /**
-     * Base é o nome do relatório, não o profissional conciliado: só 59 dos 198 glosados de
-     * 06/2026 acham atendimento pela guia, e restringir a eles escondia justamente o maior
-     * caso do mês. Quando a conciliação existe, o nome do cadastro prevalece — vem com acento
-     * e grafia corretos, enquanto o relatório varia ("JOSE" x "JOSÉ", sobrenome trocado de
-     * ordem). O agrupamento é por nome normalizado, senão a mesma pessoa apareceria duas vezes.
-     */
     private function rankingProfissionais()
     {
         $itens = $this->escopo()->glosados()
@@ -187,9 +175,6 @@ class Index extends Component
                 continue;
             }
 
-            // A chave é sempre o nome do relatório: ele existe em toda linha. Usar o nome do
-            // cadastro quando há vínculo partiria a mesma pessoa em dois grupos, porque as
-            // grafias divergem ("DÉBORA ... CÂMARA" no relatório, "DEBORA ... CAMARA" no cadastro).
             $chave = $this->normalizar($nomeRelatorio ?: $item->professional->name);
 
             $agrupado[$chave] ??= [
@@ -220,11 +205,6 @@ class Index extends Component
             ->values();
     }
 
-    /**
-     * "JOSÉ EDIVAN" e "JOSE EDIVAN" precisam cair no mesmo grupo. Str::ascii tem tabela
-     * própria e dá sempre o mesmo resultado; `iconv` com //TRANSLIT depende do locale do
-     * servidor e chega a devolver "D'EBORA", que não agruparia nada.
-     */
     private function normalizar(?string $nome): string
     {
         return preg_replace('/\s+/', ' ', trim(Str::upper(Str::ascii((string) $nome))));
@@ -258,8 +238,6 @@ class Index extends Component
                                     ? GlosaItem::with(['reasons.code', 'professional', 'patient', 'appointment', 'batch.unit'])
                                         ->find($this->detalheId)
                                     : null,
-            // Só os GLOSADOS sem atendimento interessam à nota do ranking; contar todos os
-            // itens sem vínculo daria um número muito maior e sem relação com o que está ali.
             'semVinculo'        => $this->escopo()->glosados()->naoConciliados()->count(),
         ]);
     }
