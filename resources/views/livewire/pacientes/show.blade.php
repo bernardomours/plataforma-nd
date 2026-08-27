@@ -40,12 +40,14 @@
                     </div>
                 </div>
 
-                <div class="flex-shrink-0 w-full sm:w-auto mt-4 sm:mt-0">
-                    <button wire:click="$dispatch('abrir-modal-editar-paciente')" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                        Editar Cadastro
-                    </button>
-                </div>
+                @hasanyrole('admin|manager|administrative')
+                    <div class="flex-shrink-0 w-full sm:w-auto mt-4 sm:mt-0">
+                        <button wire:click="$dispatch('abrir-modal-editar-paciente')" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            Editar Cadastro
+                        </button>
+                    </div>
+                @endhasanyrole
             </div>
 
             @if($patient->patientServices && $patient->patientServices->isNotEmpty())
@@ -91,11 +93,13 @@
                 Cargas Horárias
             </button>
 
+            @hasanyrole('admin|administrative')
             <button wire:click="setAba('laudos')" 
                     class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors focus:outline-none
                     {{ $abaAtual === 'laudos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
                 Laudos e Documentos
             </button>
+            @endhasanyrole
         </nav>
     </div>
 

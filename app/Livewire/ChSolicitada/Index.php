@@ -270,6 +270,77 @@ class Index extends Component
 
     public function updatedFaixa() { $this->resetPage(); }
 
+    public function exportExcel()
+    {
+        // Mesma exigência da rota (/ch-solicitada é role:admin|manager): a ação do
+        // Livewire não passa pelo middleware da rota, e aqui o dado exportado é mais
+        // sensível que a tela (CPF e número da carteira do paciente).
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para exportar esta planilha.');
+        }
+
+        // Mesmos filtros da tela (unidade, mês/ano, convênio, terapia, busca, faixa),
+        // sem paginação: o Excel reflete exatamente o que está sendo visto na hora.
+        $registros = $this->aplicarFiltroFaixa($this->baseQuery())->get();
+
+        $fileName = 'ch-solicitada-' . now()->timezone('America/Fortaleza')->format('d-m-Y_H-i') . '.csv';
+
+        return response()->streamDownload(function () use ($registros) {
+            $file = fopen('php://output', 'w');
+
+            // Força o Excel a reconhecer caracteres especiais (acentos, cedilhas, etc)
+            fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            $separador = ';';
+
+            fputcsv($file, [
+                'PACIENTE', 'CPF', 'CARTEIRA', 'TERAPIA',
+                'CH SOLICITADA', 'CH AUTORIZADA', 'CH PLANEJADA', 'CH REALIZADA',
+            ], $separador, '"', '');
+
+            foreach ($registros as $registro) {
+                fputcsv($file, [
+                    $registro->patient->name ?? '-',
+                    $this->comoTextoNoExcel($this->formatarCpfParaExportacao($registro->patient->cpf ?? null)),
+                    $this->comoTextoNoExcel(trim((string) ($registro->patient->agreement_number ?? '')) ?: '-'),
+                    $registro->therapy->name ?? '-',
+                    (int) round($registro->requested_hours ?? 0),
+                    (int) round($registro->approved_hours ?? 0),
+                    (int) round($this->planejadasNoMes($registro)),
+                    (int) round($registro->realized_sessions ?? 0),
+                ], $separador, '"', '');
+            }
+
+            fclose($file);
+        }, $fileName);
+    }
+
+    /**
+     * CPF na base está inconsistente: 253 pacientes com máscara, 258 só dígitos, 8 com
+     * grafias soltas (espaço, ponto no lugar do traço). Aqui todo CPF de 11 dígitos sai
+     * no mesmo formato — sem tentar corrigir os que têm menos de 11, para não mascarar
+     * um erro de cadastro exibindo um número que pode estar errado.
+     */
+    private function formatarCpfParaExportacao(?string $cpf): string
+    {
+        $digitos = preg_replace('/\D/', '', (string) $cpf);
+
+        if (strlen($digitos) === 11) {
+            return substr($digitos, 0, 3) . '.' . substr($digitos, 3, 3) . '.' . substr($digitos, 6, 3) . '-' . substr($digitos, 9, 2);
+        }
+
+        return $digitos !== '' ? $digitos : '-';
+    }
+
+    /**
+     * CPF e carteira sem máscara são só dígitos — o Excel os lê como número e derruba
+     * o zero à esquerda (23 CPFs e 62 carteiras começam com zero na base). A sintaxe
+     * ="valor" força Excel, Sheets e LibreOffice a tratar a célula como texto.
+     */
+    private function comoTextoNoExcel(string $valor): string
+    {
+        return '="' . str_replace('"', '""', $valor) . '"';
+    }
+
     public function formatTime($decimalHours)
     {
         $decimalHours = (float) $decimalHours;

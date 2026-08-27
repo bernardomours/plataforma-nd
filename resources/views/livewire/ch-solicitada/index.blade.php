@@ -195,9 +195,15 @@
         <div class="bg-white shadow-sm sm:rounded-t-lg border border-gray-200 p-5 border-b-0">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-sm font-bold text-gray-800">Filtros</h3>
-                <button type="button" wire:click="clearFilters" class="text-sm font-semibold text-red-500 hover:text-red-700 transition-colors">
-                    Limpar filtros
-                </button>
+                <div class="flex items-center gap-4">
+                    <button type="button" wire:click="exportExcel" class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H8a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v11a2 2 0 01-2 2z"></path></svg>
+                        Extrair para Excel
+                    </button>
+                    <button type="button" wire:click="clearFilters" class="text-sm font-semibold text-red-500 hover:text-red-700 transition-colors">
+                        Limpar filtros
+                    </button>
+                </div>
             </div>
 
             {{-- Quebra em mais estágios: com a sidebar de 16rem, o conteúdo útil é bem

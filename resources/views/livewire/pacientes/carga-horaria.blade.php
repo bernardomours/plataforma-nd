@@ -25,12 +25,14 @@
                 <h3 class="text-lg font-bold text-gray-900 uppercase">Gestão de Cargas Horárias</h3>
                 <p class="text-sm text-gray-500 mt-1">Controle de solicitações, horas liberadas e planejamento terapêutico.</p>
             </div>
-            <div>
-                <button wire:click="openModal" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition shadow-sm flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Nova Solicitação
-                </button>
-            </div>
+            @hasanyrole('admin|manager|administrative')
+                <div>
+                    <button wire:click="openModal" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Nova Solicitação
+                    </button>
+                </div>
+            @endhasanyrole
         </div>
 
         <!-- Barra de Filtros -->
@@ -102,14 +104,16 @@
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-right space-x-2">
-                                <button wire:click="editRecord({{ $record->id }})" class="text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors inline-flex items-center gap-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                    Editar
-                                </button>
-                                <button wire:click="deleteRecord({{ $record->id }})" wire:confirm="Tem certeza que deseja excluir esta solicitação?" class="text-red-600 hover:text-red-800 font-medium text-sm transition-colors inline-flex items-center gap-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    Excluir
-                                </button>
+                                @hasanyrole('admin|manager|administrative')
+                                    <button wire:click="editRecord({{ $record->id }})" class="text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors inline-flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                        Editar
+                                    </button>
+                                    <button wire:click="deleteRecord({{ $record->id }})" wire:confirm="Tem certeza que deseja excluir esta solicitação?" class="text-red-600 hover:text-red-800 font-medium text-sm transition-colors inline-flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        Excluir
+                                    </button>
+                                @endhasanyrole
                             </td>
                         </tr>
                     @empty

@@ -51,7 +51,11 @@ class Edit extends Component
     #[On('abrir-modal-editar-paciente')]
     public function abrirModal()
     {
-        $this->preencherFormulario(); 
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para editar dados de pacientes.');
+        }
+
+        $this->preencherFormulario();
         $this->showModal = true;
     }
 
@@ -106,6 +110,10 @@ class Edit extends Component
 
     public function update()
     {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para editar dados de pacientes.');
+        }
+
         $this->validate();
 
         try {

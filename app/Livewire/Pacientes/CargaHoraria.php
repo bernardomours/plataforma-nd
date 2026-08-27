@@ -72,8 +72,18 @@ class CargaHoraria extends Component
         $this->resetPage();
     }
 
+    /** Só coordenação (admin, manager, administrative) gerencia CH — mesmo grupo de /solicitacao-ch. */
+    private function autorizarGestaoCH(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para gerenciar cargas horárias.');
+        }
+    }
+
     public function openModal()
     {
+        $this->autorizarGestaoCH();
+
         $this->resetValidation();
         $this->resetForm();
         $this->adicionarTerapia(); // Já inicia com 1 linha vazia
@@ -116,7 +126,9 @@ class CargaHoraria extends Component
 
     public function editRecord($id)
     {
-        $this->resetValidation(); 
+        $this->autorizarGestaoCH();
+
+        $this->resetValidation();
         $this->resetForm();
 
         $record = RequestedService::findOrFail($id);
@@ -147,6 +159,8 @@ class CargaHoraria extends Component
 
     private function processSave()
     {
+        $this->autorizarGestaoCH();
+
         $this->validate();
 
         $formattedDate = $this->month_year . '-01';
@@ -300,6 +314,8 @@ class CargaHoraria extends Component
     
     public function deleteRecord($id)
     {
+        $this->autorizarGestaoCH();
+
         RequestedService::findOrFail($id)->delete();
         session()->flash('message', 'Registro excluído com sucesso!');
     }

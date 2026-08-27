@@ -33,6 +33,19 @@ autorização exige usuário com papel **exclusivo** — senão o resultado enga
 Checagem em componente **não é redundante** com o middleware da rota: as ações do Livewire vão
 para `livewire/update`, que não reexecuta o middleware da rota original.
 
+**`/pacientes/{patient}` é aberta a qualquer papel autenticado de propósito** — profissional
+precisa ver a própria agenda de pacientes no dia a dia. Isso não estende às ações de escrita: até
+08/2026, `Pacientes\Edit` (editar cadastro) e `Pacientes\CargaHoraria` (CH Solicitada/Planejada
+por paciente) não tinham nenhuma checagem de papel em nenhum método — qualquer profissional
+autenticado conseguia editar dados de paciente e criar/editar/excluir CH pela tela normal, sem
+precisar de requisição forjada. Corrigido com `hasAnyRole(['admin','manager','administrative'])`
+em todo método que abre modal ou grava (`abrirModal`/`update` em Edit;
+`openModal`/`editRecord`/`processSave`/`deleteRecord` em CargaHoraria) — mesmo grupo de papéis já
+usado em `/solicitacao-ch` e no `deleteAppointment` de Terapias Realizadas. Os botões também
+somem da tela pra quem não tem o papel (`@hasanyrole`), mas isso é só UX — quem segura a porta é
+o método. A aba "Laudos e Documentos" do Show, apesar de listada junto nesse relato, não tinha
+nada a proteger: é um placeholder ("Em Breve"), sem componente nem dado por trás.
+
 ---
 
 ## Isolamento multi-unidade
@@ -198,6 +211,29 @@ ultrapassava a maior requisição isolada.
 Sem o agrupamento, julho/2026 exibia 15.868 sessões contra 14.777 reais. O filtro de faixa usa
 `HAVING` (compara agregados), não `WHERE`. `appointments.guide` **não** vincula atendimento a
 requisição — numerações diferentes, zero correspondências.
+
+**Extração para Excel** (`exportExcel()`, botão "Extrair para Excel" nos Filtros). CSV com BOM
+e separador `;`, mesmo padrão do export de Terapias Realizadas. Colunas: paciente, CPF e carteira
+(do cadastro do paciente, não do relatório do convênio), terapia, e as quatro agregações já
+descritas na tabela acima (solicitada, autorizada, planejada, realizada) — sem aderência nem
+"falta", que são derivadas, não CH. Usa a mesma
+`baseQuery()` + `aplicarFiltroFaixa()` da tela, sem paginação: reflete exatamente os filtros
+ativos (unidade, mês/ano, convênio, terapia, busca, faixa). Guardado com `admin|manager` —
+mesmo grupo do middleware da rota `/ch-solicitada`, mas repetido no método porque o dado
+exportado (CPF, carteira) é mais sensível que o que a tela já mostra, e a ação do Livewire não
+passa pelo middleware da rota.
+
+**CPF/carteira sujos na base — normalizados só no export, não no cadastro.** `patients.cpf`
+tem 253 registros com máscara, 258 só dígitos e 8 com grafia solta (ponto no lugar do traço,
+espaço perdido); 23 CPFs e 62 carteiras começam com zero. Sem tratamento, o Excel lê a coluna
+"só dígitos" como número — alinha à direita e **derruba o zero à esquerda**, produzindo a
+mistura visual (`162.818.934-76` ao lado de `71303330490`) que motivou a correção.
+`formatarCpfParaExportacao()` remonta todo CPF de 11 dígitos no mesmo formato, não tenta
+adivinhar os com menos de 11 (mostra os dígitos crus — mascarar um cadastro já errado seria
+pior). `comoTextoNoExcel()` envolve CPF e carteira em `="valor"`: força Excel/Sheets/LibreOffice
+a tratar como texto, preservando o zero à esquerda em qualquer tamanho — inclusive as carteiras,
+que variam de 7 a 20 dígitos e não têm máscara natural para se apoiar. Índice de dados sujos do
+CPF fica só aqui: a coluna em si continua exatamente como está no cadastro.
 
 ### Produção e pagamento
 
