@@ -5,9 +5,9 @@
 
     $picoGlosa = max(1, $evolucao->max('glosa'));
     $temFiltroDeLista = $codigo !== '' || $busca !== '' || $situacao !== 'glosados';
-    $rotuloEscopo = $competencia
-        ? \Carbon\Carbon::parse($competencia)->translatedFormat('F/Y')
-        : 'todas as competências';
+    $rotuloEscopo = $mes
+        ? ($mesesLista[$mes] ?? '') . '/' . $ano
+        : 'todo o ano de ' . $ano;
 @endphp
 
 <div>
@@ -49,13 +49,23 @@
     {{-- Filtros da página --}}
     <div class="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-end">
-            <div class="sm:w-56">
-                <label for="competencia" class="mb-1 block text-xs font-semibold text-gray-700">Competência</label>
-                <select id="competencia" wire:model.live="competencia"
+            <div class="sm:w-44">
+                <label for="mes" class="mb-1 block text-xs font-semibold text-gray-700">Mês</label>
+                <select id="mes" wire:model.live="mes"
                         class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    <option value="">Todas as competências</option>
-                    @foreach($competenciasLista as $c)
-                        <option value="{{ $c->toDateString() }}">{{ ucfirst($c->translatedFormat('F/Y')) }}</option>
+                    <option value="">Ano inteiro</option>
+                    @foreach($mesesLista as $numero => $nome)
+                        <option value="{{ $numero }}">{{ $nome }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="sm:w-32">
+                <label for="ano" class="mb-1 block text-xs font-semibold text-gray-700">Ano</label>
+                <select id="ano" wire:model.live="ano"
+                        class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    @foreach($anosLista as $a)
+                        <option value="{{ $a }}">{{ $a }}</option>
                     @endforeach
                 </select>
             </div>
@@ -77,7 +87,7 @@
         </div>
     </div>
 
-    <div wire:loading.class="opacity-50" wire:target="competencia,unidade_id" class="transition-opacity">
+    <div wire:loading.class="opacity-50" wire:target="mes,ano,unidade_id" class="transition-opacity">
 
         {{-- KPIs --}}
         <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -124,7 +134,7 @@
                 </div>
             </div>
             <p class="mb-5 text-xs text-gray-500">
-                Clique numa barra para filtrar a página por aquela competência.
+                Clique numa barra para filtrar por aquele mês; clique de novo para ver o ano inteiro.
             </p>
 
             @if($evolucao->isEmpty())
@@ -133,7 +143,7 @@
                 <div class="flex h-52 items-end gap-2 overflow-x-auto pb-1">
                     @foreach($evolucao as $ponto)
                         <button type="button"
-                                wire:click="$set('competencia', '{{ $ponto->atual ? '' : $ponto->competencia->toDateString() }}')"
+                                wire:click="filtrarPorCompetencia({{ $ponto->competencia->year }}, {{ $ponto->competencia->month }})"
                                 title="{{ ucfirst($ponto->titulo) }} — apresentado {{ $moeda($ponto->apresentado) }}, glosa {{ $moeda($ponto->glosa) }}"
                                 class="group flex min-w-[52px] flex-1 flex-col items-center justify-end gap-1.5 rounded-lg px-1 pt-1 transition-colors hover:bg-gray-50 {{ $ponto->atual ? 'bg-blue-50' : '' }}">
                             <span class="text-[11px] font-bold {{ $ponto->percentual >= 5 ? 'text-rose-600' : 'text-gray-500' }}">

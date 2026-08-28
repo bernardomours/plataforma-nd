@@ -157,10 +157,19 @@
                 </div>
 
                 <div class="min-w-0 flex-1">
-                    <div class="flex h-28 items-end gap-[3px]">
+                    {{-- h-32 (não h-28): a barra em si ainda escala para no máximo 100px
+                         (ver picoDoMes no componente), sobrando 20px fixos no topo para o
+                         número não colidir com a barra mais alta do mês. --}}
+                    <div class="flex h-32 items-end gap-[3px]">
                         @foreach($fitaDoMes as $d)
-                            <div class="group flex min-w-0 flex-1 flex-col justify-end"
+                            <div class="group flex min-w-0 flex-1 flex-col items-center justify-end"
                                  title="{{ $d['titulo'] }}: {{ number_format($d['total'], 0, ',', '.') }} sessões">
+                                @if($d['total'] > 0)
+                                    <span class="mb-1 whitespace-nowrap text-[9px] font-semibold leading-none nd-num"
+                                          style="color: {{ $d['fimDeSemana'] ? 'var(--ink-3)' : 'var(--ink-2)' }}">
+                                        {{ number_format($d['total'], 0, ',', '.') }}
+                                    </span>
+                                @endif
                                 <div class="nd-fita-barra w-full rounded-[2px]"
                                      style="height: {{ $d['total'] > 0 ? max(3, (int) round($d['total'] / $picoDoMes * 100)) : 3 }}px;
                                             background: {{ $d['total'] > 0 ? 'var(--accent)' : 'var(--line)' }};
@@ -610,7 +619,10 @@
                             chart: { type: 'heatmap', height: 320, toolbar: { show: false }, fontFamily: 'inherit' },
                             series: @js($ocupMapaCalor),
                             colors: ['#2a78d6'],
-                            dataLabels: { enabled: true, style: { fontSize: '10px', fontWeight: 'bold' } },
+                            {{-- Sem "colors" aqui, o ApexCharts usa branco para todo dataLabel de
+                                 heatmap — ilegível nas células claras (baixa contagem), que são a
+                                 maioria da grade. #111a26 (--ink) fica visível em toda a escala. --}}
+                            dataLabels: { enabled: true, style: { fontSize: '10px', fontWeight: 'bold', colors: ['#111a26'] } },
                             xaxis: { labels: { style: { colors: '#55616f' } } },
                             yaxis: { labels: { style: { colors: '#55616f' } } },
                             plotOptions: { heatmap: { radius: 4, enableShades: true, shadeIntensity: 0.6 } },

@@ -384,6 +384,20 @@ por motivo produziria número sem sentido — "valor apresentado do CM89" não e
 apresentado é do item, não do motivo. O gráfico de evolução responde só à unidade, já que a
 competência é o próprio eixo x.
 
+**Competência é Mês + Ano separados**, não um único seletor de mês/ano combinado. Mês vazio =
+ano inteiro — é o que permite, já em janeiro do ano seguinte, escolher "ano inteiro" e ver os
+12 meses do ano anterior somados de uma vez, sem precisar somar mês a mês. Filtragem sempre por
+intervalo (`>= início AND < fim` da competência), nunca `whereYear()`/`whereMonth()` na coluna —
+anularia o índice (ver "Armadilhas conhecidas"). Padrão ao abrir a tela: **mês anterior ao
+vigente**, não o mês corrente — o relatório da Unimed chega cerca de dois meses depois do
+atendimento, então o mês vigente quase nunca tem dado ainda. Clicar numa barra do gráfico de
+evolução filtra por aquele mês; clicar de novo na mesma barra amplia para o ano inteiro dela
+(`filtrarPorCompetencia()`).
+
+Este componente não tinha nenhuma checagem de papel própria até 28/08/2026 — só o middleware
+da rota (`role:admin|manager`), que não é reexecutado pelas ações do Livewire. Ganhou `mount()`
+com o mesmo guard ao mexer no filtro de competência.
+
 **Ranking por profissional usa `medico_nome`, não o profissional conciliado.** Em 06/2026 só
 59 dos 198 glosados acham atendimento pela guia; restringir a eles escondia o maior caso do mês
 (DIAENE JOAQUINA, 13 guias, R$ 3.264,00). O nome do relatório existe em toda linha, então é ele
@@ -414,6 +428,41 @@ correspondente; clicar de novo na mesma limpa.
 **Dado sujo na origem:** 6 linhas em 79.246 têm `apresentado - glosa != liberado` — uma com
 apresentado 180, glosa 180 e liberado 180 ao mesmo tempo, e duas em 07/2026 onde o convênio
 liberou 136 tendo sido apresentados 130. O comando avisa e não corrige: o erro é do relatório.
+
+### Acompanhamento de Recurso de Glosa
+
+Tela irmã do Relatórios Mensais, sob o novo agrupamento de menu "Acompanhamento de Glosas"
+(que separou de "Apuração", renomeado "Produção"). Cobre a etapa depois da glosa: a clínica
+recorre junto ao convênio, parte do valor volta ("recursado"), e desse recursado, parte é
+efetivamente paga ("acatado"). Preenchimento 100% manual pela coordenação — nada disso vem de
+importação.
+
+`glosa_recursos` é **um registro por lote de glosa** (`glosa_batch_id` único) — não guarda
+histórico de reenvios, só o estado atual do recurso daquele lote. Campos digitados: `lote`
+(número do lote do recurso junto ao convênio — **não é** `glosa_items.lote`, que é o lote de
+faturamento original do item, coisa diferente), `valor_recursado`, `valor_acatado` e `status`
+(lista fechada por enquanto: Em Análise, Pagamento Efetuado — `App\Models\GlosaRecurso::STATUS_OPTIONS`).
+
+Os percentuais de conversão **não são gravados**: `% conversão recursado` = recursado / glosa
+do lote, `% conversão acatado` = acatado / recursado, calculados na tela
+(`Producao\Glosas\Recursos`). Período inicial/final (colunas que aparecem numa planilha de
+referência do time) ficaram de fora de propósito — não existe essa granularidade em
+`glosa_batches` hoje, e decidiu-se não adicionar.
+
+**Única tela de glosa que `administrative` acessa.** Relatórios Mensais continua
+`admin|manager`; Acompanhamento de Recursos é `admin|manager|administrative` — tanto na rota
+quanto checado de novo no componente (`autorizarAcesso()` no `mount()` e repetido em
+`abrirModal`/`salvar`, mesmo motivo de sempre: ação do Livewire não passa pelo middleware da
+rota). Como `administrative` não é admin/manager, `getAllowedUnitIds()` devolve array, não
+`null` — a tela aplica esse filtro em toda consulta (`escopoUnidade()`), coisa que a tela de
+Relatórios Mensais nunca precisou fazer por ser só admin|manager. **Isso é ortogonal ao
+`can_access_production`** (coluna em `users`, middleware `CheckProductionAccess`, guarda toda
+a área `/producao`): liberar o papel Spatie não basta se o usuário administrative individual
+não tiver essa flag — em 28/08/2026 só 2 dos 12 administrative tinham.
+
+Lista só lotes com `vl_glosa > 0` — sem glosa não há o que recorrer. Mesma separação de escopo
+de filtro do Relatórios Mensais: competência e unidade recortam KPIs + lista, busca e status
+recortam só a lista.
 
 ### Sistema de tokens `nd-ui`
 

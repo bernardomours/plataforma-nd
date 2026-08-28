@@ -6,6 +6,7 @@ use App\Models\GlosaBatch;
 use App\Models\GlosaItem;
 use App\Models\GlosaReasonCode;
 use App\Models\Unit;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -17,7 +18,10 @@ class Index extends Component
 {
     use WithPagination;
 
-    public string $competencia = '';
+    // Mês vazio = ano inteiro (ex.: em 2027, ver 2026 todo). Ano é sempre exigido —
+    // sem isso a consulta voltaria a varrer a tabela inteira sem filtro nenhum.
+    public $mes;
+    public $ano;
     public $unidade_id = '';
 
     public string $codigo = '';
@@ -26,7 +30,49 @@ class Index extends Component
 
     public ?int $detalheId = null;
 
-    public function updatingCompetencia()
+    public function mount()
+    {
+        // Papel pelo Spatie: componente não tinha checagem própria, só o middleware da
+        // rota (role:admin|manager), que não é reexecutado pelas ações do Livewire.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para acessar os Relatórios de Glosa.');
+        }
+
+        $mesAnterior = now()->subMonthNoOverflow();
+        $this->mes = $mesAnterior->month;
+        $this->ano = $mesAnterior->year;
+    }
+
+    /** Início (inclusive) e fim (exclusivo) da competência selecionada, para filtrar por
+     *  intervalo — nunca whereYear()/whereMonth(), que anulam o índice da coluna. */
+    private function periodoCompetencia(): array
+    {
+        $inicio = Carbon::create((int) $this->ano, $this->mes ? (int) $this->mes : 1, 1)->startOfDay();
+        $fim = $this->mes ? $inicio->copy()->addMonthNoOverflow() : $inicio->copy()->addYear();
+
+        return [$inicio, $fim];
+    }
+
+    public function filtrarPorCompetencia(int $ano, int $mes)
+    {
+        // Clicar de novo no mês já ativo amplia a visão para o ano inteiro; clicar num
+        // mês diferente troca o filtro normalmente.
+        if ((int) $this->ano === $ano && (int) $this->mes === $mes) {
+            $this->mes = null;
+        } else {
+            $this->ano = $ano;
+            $this->mes = $mes;
+        }
+
+        $this->resetPage();
+    }
+
+    public function updatingMes()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingAno()
     {
         $this->resetPage();
     }
@@ -70,8 +116,11 @@ class Index extends Component
 
     private function escopo()
     {
+        [$inicio, $fim] = $this->periodoCompetencia();
+
         return GlosaItem::query()
-            ->when($this->competencia, fn ($q) => $q->where('competencia', $this->competencia))
+            ->where('competencia', '>=', $inicio)
+            ->where('competencia', '<', $fim)
             ->when($this->unidade_id, fn ($q) => $q->where('unit_id', $this->unidade_id));
     }
 
@@ -128,17 +177,21 @@ class Index extends Component
                 'apresentado' => (float) $b->apresentado,
                 'glosa'       => (float) $b->glosa,
                 'percentual'  => $b->apresentado > 0 ? $b->glosa / $b->apresentado * 100 : 0,
-                'atual'       => $this->competencia === $b->competencia->toDateString(),
+                'atual'       => (int) $b->competencia->year === (int) $this->ano
+                                  && (! $this->mes || (int) $b->competencia->month === (int) $this->mes),
             ]);
     }
 
     private function rankingMotivos()
     {
+        [$inicio, $fim] = $this->periodoCompetencia();
+
         return DB::table('glosa_reasons')
             ->join('glosa_items', 'glosa_items.id', '=', 'glosa_reasons.glosa_item_id')
             ->leftJoin('glosa_reason_codes', 'glosa_reason_codes.codigo', '=', 'glosa_reasons.codigo')
             ->where('glosa_items.status', '<>', GlosaItem::STATUS_LIBERADO)
-            ->when($this->competencia, fn ($q) => $q->where('glosa_items.competencia', $this->competencia))
+            ->where('glosa_items.competencia', '>=', $inicio)
+            ->where('glosa_items.competencia', '<', $fim)
             ->when($this->unidade_id, fn ($q) => $q->where('glosa_items.unit_id', $this->unidade_id))
             ->selectRaw('glosa_reasons.codigo,
                          COALESCE(glosa_reason_codes.descricao, MAX(glosa_reasons.descricao)) descricao,
@@ -212,10 +265,18 @@ class Index extends Component
 
     public function render()
     {
-        $competencias = GlosaBatch::select('competencia')
-            ->distinct()
-            ->orderByDesc('competencia')
-            ->pluck('competencia');
+        // Ano sempre inclui o corrente, mesmo sem glosa lançada ainda — é o caso que
+        // motivou a separação de mês/ano: poder escolher o ano anterior por inteiro
+        // assim que o calendário virar.
+        $anosLista = GlosaBatch::selectRaw('DISTINCT YEAR(competencia) as ano')
+            ->pluck('ano')
+            ->push(now()->year)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $mesesLista = collect(range(1, 12))
+            ->mapWithKeys(fn ($m) => [$m => ucfirst(Carbon::create(2000, $m, 1)->translatedFormat('F'))]);
 
         $kpis = $this->kpis();
 
@@ -230,7 +291,8 @@ class Index extends Component
                                     ->orderByDesc('vl_glosa')
                                     ->orderByDesc('dt_item')
                                     ->paginate(15),
-            'competenciasLista' => $competencias,
+            'anosLista'         => $anosLista,
+            'mesesLista'        => $mesesLista,
             'unidadesLista'     => Unit::whereIn('id', GlosaBatch::distinct()->pluck('unit_id')->filter())
                                     ->orderBy('name')->get(),
             'codigosLista'      => GlosaReasonCode::orderBy('codigo')->get(),

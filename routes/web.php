@@ -31,6 +31,7 @@ use App\Livewire\Producao\Index as ProducaoIndex;
 use App\Livewire\Producao\RegrasPagamento\Index as RegrasPagamentoIndex;
 use App\Livewire\Producao\AtendimentosRealizados\Index as AtendimentosIndex;
 use App\Livewire\Producao\Glosas\Index as GlosasIndex;
+use App\Livewire\Producao\Glosas\Recursos as GlosasRecursosIndex;
 use App\Livewire\AuditoriaHumana\Index as AtendimentoHumanaIndex;
 use App\Livewire\Qualidade\Index as QualidadeIndex;
 use App\Livewire\Qualidade\Create as QualidadeCreate;
@@ -99,6 +100,12 @@ Route::middleware(['auth', 'producao.access'])->prefix('producao')->group(functi
 
     Route::middleware('role:admin|manager')->group(function () {
         Route::get('/glosas', GlosasIndex::class)->name('producao.glosas');
+    });
+
+    // Única tela de glosas que administrative acessa — preenche o acompanhamento de
+    // recurso manualmente. Relatórios Mensais (acima) continua admin|manager.
+    Route::middleware('role:admin|manager|administrative')->group(function () {
+        Route::get('/glosas/recursos', GlosasRecursosIndex::class)->name('producao.glosas.recursos');
     });
 
     Route::post('/sair', function (Request $request) {
