@@ -58,7 +58,11 @@ class Edit extends Component
         $data = [
             'name' => $this->name,
             'email' => $this->email,
-            'birth_date' => $this->birth_date,
+            // Campo vazio chega como string '' (wire:model num <input type="date">), não
+            // null — o MySQL rejeita '' como data inválida (erro 500, não erro de
+            // validação, porque a query já passou pela validação nullable). Sem esse
+            // ?: null, limpar o aniversário de uma conta funcional quebrava o salvamento.
+            'birth_date' => $this->birth_date ?: null,
             'can_access_production' => $this->can_access_production,
             'unit_id' => $this->selected_units[0] ?? null,
         ];

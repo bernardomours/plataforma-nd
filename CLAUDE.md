@@ -724,6 +724,14 @@ mesma pessoa em `Profissionais\Aniversariantes` — ela já aparecia certo pela 
 Profissional, e de novo pela conta de sistema. `birth_date = null` nas 5 contas resolve as
 duas coisas; a pessoa continua aparecendo normalmente pelo cadastro certo.
 
+**Limpar o campo no formulário sozinho não bastava — precisou de `?: null` antes de gravar.**
+`<input type="date">` com `wire:model` manda **string vazia** (`''`) quando o campo é limpo,
+nunca `null`. A validação `nullable|date` deixa `''` passar sem erro (é exatamente o que
+`nullable` faz), mas o MySQL rejeita `''` como valor de `date` — vira `QueryException` não
+tratada, ou seja, erro 500 na hora de salvar, não uma mensagem de validação normal. Aconteceu
+em produção ao tentar limpar as 5 contas acima pela tela. Corrigido em `Usuarios\Create::save()`
+e `Usuarios\Edit::update()` com `$this->birth_date ?: null` antes do `create()`/`update()`.
+
 ---
 
 ## Armadilhas conhecidas

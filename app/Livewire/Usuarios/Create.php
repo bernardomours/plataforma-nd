@@ -45,7 +45,9 @@ class Create extends Component
             'name' => $this->name,
             'email' => $this->email,
             'password' => Hash::make($this->password),
-            'birth_date' => $this->birth_date,
+            // Ver o mesmo comentário em Usuarios\Edit: '' quebra a gravação (MySQL
+            // rejeita como data inválida), precisa virar null antes.
+            'birth_date' => $this->birth_date ?: null,
             'can_access_production' => $this->can_access_production,
             'unit_id' => $this->selected_units[0] ?? null, 
         ]);
