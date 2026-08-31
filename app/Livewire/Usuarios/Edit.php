@@ -46,7 +46,11 @@ class Edit extends Component
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $this->user->id,
             'password' => 'nullable|string|min:8',
-            'birth_date' => 'required|date', 
+            // Nullable de propósito: contas funcionais/compartilhadas (recepção, caixa
+            // de setor) não representam uma pessoa e não têm aniversário — forçar data
+            // aqui é o que gerava valor placeholder (01/01/2000) preenchido só pra passar
+            // na validação, que depois vazava pra listas de aniversariante como se fosse real.
+            'birth_date' => 'nullable|date',
             'selected_roles' => 'required|array|min:1', // Exige pelo menos um cargo
             'selected_units' => 'nullable|array', 
         ]);

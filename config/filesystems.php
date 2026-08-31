@@ -60,6 +60,25 @@ return [
             'report' => false,
         ],
 
+        // Laudos e documentos pessoais (dado sensível/saúde). Disco próprio, separado
+        // do 's3' genérico, pra poder trocar disco/credencial sem afetar outro uso
+        // futuro do driver s3. DOCUMENTS_DISK=local por padrão (nada a configurar
+        // pra rodar); trocar pra DOCUMENTS_DISK=s3 + as chaves AWS_*/AWS_ENDPOINT
+        // (compatível com R2) muda o destino sem tocar em código.
+        'documents' => [
+            'driver' => env('DOCUMENTS_DISK', 'local'),
+            'root' => storage_path('app/private/documents'),
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

@@ -9,6 +9,7 @@ use App\Livewire\Pacientes\Show as PacientesShow;
 use App\Livewire\Profissionais\Index as ProfissionaisIndex;
 use App\Livewire\Profissionais\Create as ProfissionaisCreate;
 use App\Livewire\Profissionais\Edit as ProfissionaisEdit;
+use App\Livewire\Profissionais\Aniversariantes as ProfissionaisAniversariantes;
 use App\Livewire\Servicos\Index as ServicosIndex;
 use App\Livewire\TerapiasRealizadas\Index as TerapiasRealizadasIndex;
 use App\Livewire\TerapiasRealizadas\Create as TerapiasRealizadasCreate;
@@ -37,6 +38,7 @@ use App\Livewire\Qualidade\Index as QualidadeIndex;
 use App\Livewire\Qualidade\Create as QualidadeCreate;
 use App\Livewire\Qualidade\Edit as QualidadeEdit;
 use App\Livewire\ChSolicitada\Pendencias as ChPendencias;
+use App\Http\Controllers\DocumentController;
 
 Route::redirect('/', '/dashboard');
 
@@ -49,7 +51,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/pacientes', PacientesIndex::class)->name('pacientes.index');
     Route::get('/pacientes/cadastrar', PacientesCreate::class)->name('pacientes.create');
     Route::get('/pacientes/{patient}', PacientesShow::class)->name('pacientes.show');
-    // COORDENACAO  
+
+    // Laudos e Documentos: rota dedicada (não ação do Livewire), pra abrir de verdade
+    // numa aba nova. O ID chega direto na URL, então o controller repete papel +
+    // isolamento por unidade — não dá pra confiar só no @hasanyrole da aba.
+    Route::middleware('role:admin|manager|administrative')->group(function () {
+        Route::get('/documentos/{document}/visualizar', [DocumentController::class, 'visualizar'])->name('documentos.visualizar');
+        Route::get('/documentos/{document}/baixar', [DocumentController::class, 'baixar'])->name('documentos.baixar');
+    });
+
+    // COORDENACAO
     Route::get('/acompanhamentos', AcompanhamentosIndex::class)->name('acompanhamentos.index');
     Route::get('/cronograma', CronogramaIndex::class)->name('cronograma.index');
     Route::get('/vinculos', VinculosIndex::class)->name('vinculos.index');
@@ -71,6 +82,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/profissionais', ProfissionaisIndex::class)->name('profissionais.index');
         Route::get('/profissionais/cadastrar', ProfissionaisCreate::class)->name('profissionais.create');
         Route::get('/profissionais/{professional}/editar', ProfissionaisEdit::class)->name('profissionais.edit');
+        Route::get('/profissionais/aniversariantes', ProfissionaisAniversariantes::class)->name('profissionais.aniversariantes');
         Route::get('/solicitacao-ch', ChPendencias::class)->name('ch.solicitacao');
     });
 

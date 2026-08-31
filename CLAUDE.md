@@ -89,10 +89,85 @@ Unit --< Patient --< Appointment >-- Professional
                  |-< NeuroAssessment --< NeuroSession
                  |-< Visit (acompanhamento domiciliar/escolar)
                  |-< MovementHistory (saída/retorno, polimórfico)
+                 |-< Document (laudo/documento, polimórfico)
 ```
 
 `Therapy`, `ServiceType` (Clínica/Escolar/Domiciliar) e `Agreement` (Humana, Unimed, Sulamérica,
 Central Nacional, Particular) são tabelas de apoio, vinculadas a unidades por pivô.
+
+---
+
+## Armazenamento de documentos
+
+`documents` é **polimórfica** desde o início (`documentable_type`/`documentable_id`), mesmo só
+com `Patient` implementado por enquanto — quando entrar documento pessoal de profissional
+(`Professional`), é a mesma tabela, sem migration nova. Mesmo padrão já usado em
+`MovementHistory`.
+
+Guarda só metadado no banco (`nome_original`, `mime_type`, `tamanho_bytes`, `categoria`,
+`uploaded_by`, `disk` + `path`). O arquivo em si vive num disco próprio, `documents`
+(`config/filesystems.php`), **separado do disco `s3` genérico** — assim trocar credencial/disco
+de documentos não afeta outro uso futuro do driver s3. `DOCUMENTS_DISK=local` é o padrão (nada a
+configurar pra rodar); virar `s3` + as chaves `AWS_*`/`AWS_ENDPOINT` (compatível com R2, Cloudflare)
+muda o destino sem tocar em código — a metadata sempre grava qual `disk` foi usado, então
+arquivo antigo continua achável mesmo que o disco padrão mude depois.
+
+**Por quê object storage e não o disco do próprio servidor**: hospedagem compartilhada tem cota
+de disco/inodes (ver "Armadilhas conhecidas") e é sensível a I/O extra — já vivemos um caso de
+lentidão sistêmica em 08/2026 causado por sessão/cache batendo no banco a cada request. Laudo
+digitalizado acumula rápido; migrar depois que já tem milhares de arquivo de dado de saúde é
+bem mais arriscado que decidir certo agora. `Storage::disk('documents')->temporaryUrl()` faz o
+navegador baixar direto do storage (S3/R2) sem o arquivo passar pelo worker PHP — importa pra
+desempenho igual o resto do que já foi diagnosticado nesse projeto.
+
+Nome no disco é sempre um UUID (`Str::uuid()`), nunca o nome que o usuário enviou — evita path
+traversal e não expõe nome de paciente/arquivo na estrutura do storage.
+
+**Visualizar e baixar são rotas dedicadas** (`App\Http\Controllers\DocumentController`), não
+ação do Livewire — o link precisa abrir de verdade numa aba nova (`target="_blank"`), o que uma
+`Response` devolvida por ação do Livewire não garante quando é `redirect()->away()` pra URL
+assinada do S3/R2 (navegaria a aba atual pra fora do app). Visualizar serve com
+`Content-Disposition: inline` (navegador exibe o PDF/imagem direto); baixar força `attachment`
+com o nome original do arquivo. Os dois tentam `temporaryUrl()` primeiro; disco `local` não
+implementa (lança `RuntimeException`), e o código cai automaticamente pro
+`Storage::response()`/`Storage::download()` tradicional — não precisa checar o driver
+manualmente em lugar nenhum.
+
+**A rota, por receber o ID do documento direto na URL, não herda a proteção da página do
+paciente** (que vem do global scope de `IsolatesByUnit` barrando o route model binding do
+`{patient}` antes de tudo). `DocumentController::autorizar()` repete papel e isolamento por
+unidade — mesmo padrão de `AvaliacoesNeuro\Edit::authorizeAssessmentAccess()`, lendo o paciente
+com `withoutGlobalScopes()` de propósito pra poder negar mesmo quando o scope esconderia o
+registro.
+
+**Laudos e Documentos é `admin|manager|administrative`**, mais restrito que o resto da ficha do
+paciente (`/pacientes/{patient}` é aberta a qualquer papel autenticado de propósito — ver
+"Autorização"). Justificativa: laudo é dado de saúde mais sensível que agenda/CH. Checado tanto
+no `@hasanyrole` da aba (`Pacientes\Show`) quanto de novo no `mount()` de `Pacientes\Documentos`
+— mesmo motivo de sempre, ação do Livewire não passa pelo middleware da rota, e nem pelo
+`@hasanyrole` do componente pai (que só esconde o botão da aba, não impede montar o componente
+via URL direta com `?aba=laudos`).
+
+Isolamento por unidade **não precisou de código extra**: `Patient` já tem o global scope de
+`IsolatesByUnit`, então o route model binding do `{patient}` já filtra por unidade antes do
+componente sequer montar — diferente de `NeuroAssessment`, que não tem `unit_id` e precisou de
+checagem manual (`authorizeAssessmentAccess()`).
+
+Tipo de arquivo permitido: PDF, JPG, PNG. Tamanho máximo: 10MB. Categorias fechadas por
+enquanto: Laudo, Receita, Exame, Documentos Pessoais, Outros (`Document::CATEGORIA_OPTIONS`).
+
+**A tela agrupa em 3 "pastas" visuais** (`Document::PASTAS`), que **não** são 1:1 com as
+categorias — é só como a listagem organiza o que já existe, a categoria gravada continua a
+mesma: Laudos = categoria Laudo; Docs Pessoais = categoria Documentos Pessoais; Outros = Receita
++ Exame + Outros somadas. Abrir o modal de dentro de uma pasta com categoria única já
+pré-seleciona ela; de dentro de "Outros" (3 categorias) fica em branco, porque não dá pra
+adivinhar qual das três.
+
+Exclusão é soft delete (mesmo padrão do resto do sistema) — o arquivo físico **não** é apagado
+do disco quando o registro é excluído, só fica invisível na tela. Decisão consciente: mantém a
+possibilidade de restaurar e o rastro de auditoria; o custo de armazenamento de manter o
+arquivo órfão é baixo (R2 tem camada grátis generosa) comparado ao risco de apagar dado de saúde
+sem um processo formal de expurgo.
 
 ---
 
@@ -621,6 +696,33 @@ profissional e definir a senha. Fechar isso exige senha aleatória no cadastro.
 | `app:send-birthday-emails` | agendado às 08:00; e-mail de aniversariantes ao RH |
 
 Todos com modo diagnóstico por padrão — sem `--fix` apenas simulam.
+
+`Profissionais\Aniversariantes` (`/profissionais/aniversariantes`) é a versão **de consulta**
+do mesmo dado que `app:send-birthday-emails` manda por e-mail — o e-mail avisa quem faz
+aniversário **hoje**, a tela lista **todo mundo, o ano inteiro**, agrupado por mês e ordenado
+por dia, pro RH conferir contra o mural físico da clínica sem precisar abrir profissional por
+profissional. Só profissionais ativos (SoftDeletes já exclui os inativados por padrão) e só
+os das unidades permitidas ao usuário (mesmo `getAllowedUnitIds()` de sempre).
+
+**Junta `Professional` com `User`, não só `Professional`.** admin, manager e administrative
+são contas de sistema sem ficha de profissional clínico — ficavam de fora até 28/08/2026.
+Mesma regra de exclusão do `SendEmailToCelebrant`: `User` só entra quando **não** tem
+`Professional` vinculado (`whereDoesntHave('professional', fn ($q) => $q->withTrashed())`),
+senão quem é as duas coisas apareceria duplicado. Usuário de sistema leva um selo com o papel
+(Admin/Gestor/Administrativo) pra diferenciar de profissional clínico na lista.
+
+**`users.birth_date` é `nullable`, e a validação de `Usuarios\Create`/`Edit` também precisa
+ser** (mudou de `required` em 28/08/2026). Contas funcionais/compartilhadas (recepção, caixa de
+setor tipo `controlesinternos@nd*.com`) não representam uma pessoa e não têm aniversário — antes
+da mudança, a validação obrigatória forçava alguém a inventar uma data só pra salvar o
+cadastro, e isso vazava pra qualquer lista de aniversariante como se fosse real. Achamos duas
+consequências desse hábito: `Recepção Santa Cruz` e `Recepção João Câmara` tinham `01/01/2000`
+(claramente placeholder — três contas diferentes "nascendo" no mesmo 1º de janeiro do ano 2000
+não é coincidência); e `controlesinternos@ndmossoro.com`/`controlesinternos@ndnatal.com` tinham
+nome e data de uma pessoa real emprestados (Vitória Morais, Luana Amorim), que **duplicava** a
+mesma pessoa em `Profissionais\Aniversariantes` — ela já aparecia certo pela ficha de
+Profissional, e de novo pela conta de sistema. `birth_date = null` nas 5 contas resolve as
+duas coisas; a pessoa continua aparecendo normalmente pelo cadastro certo.
 
 ---
 

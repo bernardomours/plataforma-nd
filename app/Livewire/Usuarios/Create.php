@@ -33,7 +33,10 @@ class Create extends Component
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
-            'birth_date' => 'required|date', 
+            // Nullable de propósito: contas funcionais/compartilhadas (recepção, caixa
+            // de setor) não representam uma pessoa e não têm aniversário — ver o mesmo
+            // comentário em Usuarios\Edit.
+            'birth_date' => 'nullable|date',
             'selected_roles' => 'required|array|min:1', // Exige pelo menos um cargo
             'selected_units' => 'nullable|array', 
         ]);
