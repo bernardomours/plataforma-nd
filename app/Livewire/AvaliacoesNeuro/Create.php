@@ -15,6 +15,15 @@ class Create extends Component
     public $patient_id = '';
     public $professional_id = '';
 
+    public function mount()
+    {
+        // Checagem própria: ação do Livewire não passa pelo middleware da rota
+        // (role:admin|manager|administrative|avaliador_neuro).
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative', 'avaliador_neuro'])) {
+            abort(403, 'Você não tem permissão para registrar Avaliações Neuro.');
+        }
+    }
+
     public function save()
     {
         $this->validate([

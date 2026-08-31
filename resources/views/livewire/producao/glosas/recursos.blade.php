@@ -125,10 +125,13 @@
                     <tbody class="divide-y divide-gray-100">
                         @forelse($lotes as $batch)
                             @php
-                                $recurso = $batch->recurso;
+                                $qtdRecursos = $batch->recursos_count;
+                                $somaRecursado = $batch->recursos_sum_valor_recursado;
+                                $somaAcatado = $batch->recursos_sum_valor_acatado;
                                 $percGlosado = $batch->vl_apresentado > 0 ? ($batch->vl_glosa / $batch->vl_apresentado) * 100 : 0;
-                                $pctRec = $convRecursado($batch->vl_glosa, $recurso?->valor_recursado);
-                                $pctAcat = $convAcatado($recurso?->valor_recursado, $recurso?->valor_acatado);
+                                $pctRec = $convRecursado($batch->vl_glosa, $somaRecursado);
+                                $pctAcat = $convAcatado($somaRecursado, $somaAcatado);
+                                $unico = $qtdRecursos === 1 ? $batch->recursos->first() : null;
                             @endphp
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-3">
@@ -141,29 +144,49 @@
                                 <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-rose-700">{{ $moeda($batch->vl_glosa) }}</td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">{{ $pct($percGlosado) }}</td>
 
-                                <td class="border-l border-blue-100 bg-blue-50/40 px-4 py-3 whitespace-nowrap">{{ $recurso?->lote ?? '—' }}</td>
+                                <td class="border-l border-blue-100 bg-blue-50/40 px-4 py-3 whitespace-nowrap">
+                                    @if($qtdRecursos === 0)
+                                        —
+                                    @elseif($qtdRecursos === 1)
+                                        {{ $unico->lote ?? '—' }}
+                                    @else
+                                        <span class="cursor-help" title="{{ $batch->recursos->pluck('lote')->filter()->implode(', ') ?: 'sem número de lote' }}">
+                                            Vários ({{ $qtdRecursos }})
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="bg-blue-50/40 px-4 py-3 text-right whitespace-nowrap">
-                                    {{ $recurso?->valor_recursado !== null ? $moeda($recurso->valor_recursado) : '—' }}
+                                    {{ $somaRecursado !== null ? $moeda($somaRecursado) : '—' }}
                                 </td>
                                 <td class="bg-blue-50/40 px-4 py-3 text-right whitespace-nowrap">{{ $pctRec !== null ? $pct($pctRec) : '—' }}</td>
                                 <td class="bg-blue-50/40 px-4 py-3 text-right whitespace-nowrap">
-                                    {{ $recurso?->valor_acatado !== null ? $moeda($recurso->valor_acatado) : '—' }}
+                                    {{ $somaAcatado !== null ? $moeda($somaAcatado) : '—' }}
                                 </td>
                                 <td class="bg-blue-50/40 px-4 py-3 text-right whitespace-nowrap">{{ $pctAcat !== null ? $pct($pctAcat) : '—' }}</td>
                                 <td class="bg-blue-50/40 px-4 py-3 whitespace-nowrap">
-                                    @if($recurso?->status)
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap
-                                            {{ $recurso->status === 'pagamento_efetuado' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' }}">
-                                            {{ $recurso->statusLabel() }}
-                                        </span>
-                                    @else
+                                    @if($qtdRecursos === 0)
                                         <span class="text-xs text-gray-400">—</span>
+                                    @elseif($qtdRecursos === 1 && $unico->status)
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap
+                                            {{ $unico->status === 'pagamento_efetuado' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' }}">
+                                            {{ $unico->statusLabel() }}
+                                        </span>
+                                    @elseif($qtdRecursos === 1)
+                                        <span class="text-xs text-gray-400">—</span>
+                                    @else
+                                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700"
+                                              title="{{ $batch->recursos->map(fn ($r) => $r->statusLabel() ?? 'sem status')->implode(', ') }}">
+                                            {{ $qtdRecursos }} recursos
+                                        </span>
                                     @endif
                                 </td>
                                 <td class="bg-blue-50/40 px-4 py-3 text-right whitespace-nowrap">
                                     <button type="button" wire:click="abrirModal({{ $batch->id }})"
                                             class="text-sm font-semibold text-blue-600 hover:text-blue-800">
-                                        {{ $recurso ? 'Editar' : 'Registrar' }}
+                                        @if($qtdRecursos === 0) Registrar
+                                        @elseif($qtdRecursos === 1) Editar
+                                        @else Gerenciar
+                                        @endif
                                     </button>
                                 </td>
                             </tr>
@@ -186,53 +209,79 @@
         </div>
     </div>
 
-    {{-- Modal de registro/edição --}}
+    {{-- Modal de registro/edição — repeater: um lote pode ter mais de um recurso,
+         raramente (reenvio, nova tentativa). Mesmo padrão de Pacientes\CargaHoraria. --}}
     @if($isModalOpen)
         <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" wire:click="fecharModal"></div>
                 <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
 
-                <div class="inline-block transform overflow-hidden rounded-xl border border-gray-200 bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+                <div class="inline-block transform overflow-hidden rounded-xl border border-gray-200 bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle">
                     <form wire:submit="salvar">
-                        <div class="bg-white px-6 pt-5 pb-6">
-                            <h3 class="mb-4 border-b pb-2 text-lg font-bold leading-6 text-gray-900" id="modal-title">
-                                Acompanhamento de Recurso
-                            </h3>
+                        <div class="max-h-[75vh] overflow-y-auto bg-white px-6 pt-5 pb-6">
+                            <div class="mb-4 flex items-center justify-between border-b pb-2">
+                                <h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
+                                    Acompanhamento de Recurso
+                                </h3>
+                                <button type="button" wire:click="adicionarLinhaRecurso"
+                                        class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Adicionar recurso
+                                </button>
+                            </div>
 
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div class="md:col-span-2">
-                                    <label class="mb-1 block text-sm font-semibold text-gray-700">Lote</label>
-                                    <input type="text" wire:model="lote" maxlength="30" placeholder="Número do lote do recurso"
-                                           class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    @error('lote') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                                </div>
+                            <div class="space-y-4">
+                                @foreach($recursosForm as $index => $linha)
+                                    <div wire:key="recurso-{{ $index }}" class="relative rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                        @if(count($recursosForm) > 1)
+                                            <button type="button" wire:click="removerLinhaRecurso({{ $index }})"
+                                                    wire:confirm="{{ $linha['id'] ? 'Excluir este recurso já registrado?' : 'Remover esta linha?' }}"
+                                                    class="absolute right-2 top-2 text-red-500 hover:text-red-700" title="Remover">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            </button>
+                                        @endif
 
-                                <div>
-                                    <label class="mb-1 block text-sm font-semibold text-gray-700">Valor Recursado (R$)</label>
-                                    <input type="number" step="0.01" min="0" wire:model="valor_recursado" placeholder="0,00"
-                                           class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    @error('valor_recursado') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                                </div>
+                                        @if(count($recursosForm) > 1)
+                                            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Recurso {{ $index + 1 }}</p>
+                                        @endif
 
-                                <div>
-                                    <label class="mb-1 block text-sm font-semibold text-gray-700">Valor Acatado (R$)</label>
-                                    <input type="number" step="0.01" min="0" wire:model="valor_acatado" placeholder="0,00"
-                                           class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    @error('valor_acatado') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                                </div>
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div class="md:col-span-2">
+                                                <label class="mb-1 block text-sm font-semibold text-gray-700">Lote</label>
+                                                <input type="text" wire:model="recursosForm.{{ $index }}.lote" maxlength="30" placeholder="Número do lote do recurso"
+                                                       class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                @error("recursosForm.$index.lote") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                            </div>
 
-                                <div class="md:col-span-2">
-                                    <label class="mb-1 block text-sm font-semibold text-gray-700">Status</label>
-                                    <select wire:model="modal_status"
-                                            class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                        <option value="">Sem status definido</option>
-                                        @foreach($statusOptions as $valor => $rotulo)
-                                            <option value="{{ $valor }}">{{ $rotulo }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('modal_status') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
-                                </div>
+                                            <div>
+                                                <label class="mb-1 block text-sm font-semibold text-gray-700">Valor Recursado (R$)</label>
+                                                <input type="number" step="0.01" min="0" wire:model="recursosForm.{{ $index }}.valor_recursado" placeholder="0,00"
+                                                       class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                @error("recursosForm.$index.valor_recursado") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                            </div>
+
+                                            <div>
+                                                <label class="mb-1 block text-sm font-semibold text-gray-700">Valor Acatado (R$)</label>
+                                                <input type="number" step="0.01" min="0" wire:model="recursosForm.{{ $index }}.valor_acatado" placeholder="0,00"
+                                                       class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                @error("recursosForm.$index.valor_acatado") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                            </div>
+
+                                            <div class="md:col-span-2">
+                                                <label class="mb-1 block text-sm font-semibold text-gray-700">Status</label>
+                                                <select wire:model="recursosForm.{{ $index }}.status"
+                                                        class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                                    <option value="">Sem status definido</option>
+                                                    @foreach($statusOptions as $valor => $rotulo)
+                                                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                                    @endforeach
+                                                </select>
+                                                @error("recursosForm.$index.status") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
                         </div>
                         <div class="rounded-b-xl border-t border-gray-100 bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">

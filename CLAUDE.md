@@ -23,9 +23,21 @@ a 3 coordenadores que antes viam tudo. Pode ser removida por migration quando ho
 Não confundir com **`professionals.role`**, que é outra coluna, legítima, com o enum
 `ProfessionalRole` (supervisor/coordinator/therapist/uncategorized).
 
-Papéis cadastrados no Spatie: `admin`, `manager`, `administrative`, `coordinator`, `profissional`.
-**`supervisor` não existe como papel de acesso** — só como `ProfessionalRole`. As checagens que
-citam supervisor casam apenas com coordenadores hoje.
+Papéis cadastrados no Spatie: `admin`, `manager`, `administrative`, `coordinator`, `profissional`,
+`avaliador_neuro`. **`supervisor` não existe como papel de acesso** — só como `ProfessionalRole`.
+As checagens que citam supervisor casam apenas com coordenadores hoje.
+
+**`avaliador_neuro` é aditivo**, criado em 28/08/2026 pra resolver um caso específico: um
+coordenador que também realiza avaliação neuro na prática precisava acessar a ferramenta, mas
+abrir pra todo o papel `coordinator` liberaria os outros 15 que não avaliam. Em vez de um
+mecanismo de exceção por usuário (que não existe em lugar nenhum do sistema e quebraria
+"Spatie é a única fonte de papel"), criou-se um papel novo, atribuível a qualquer usuário pela
+tela de Usuários — igual a qualquer outro papel — sem tocar no papel base da pessoa. Vale só
+para `/avaliacoes-neuro*`: `role:admin|manager|avaliador_neuro` na listagem,
+`role:admin|manager|administrative|avaliador_neuro` em criar/editar — grupo de rota próprio,
+separado do grupo "FREQUENCIA" (que também tem Profissionais e Solicitação de CH) pra não
+vazar acesso a outras telas. Quando aparecer o próximo caso, é só marcar o checkbox na edição
+do usuário — não precisa mexer em código de novo.
 
 17 usuários acumulam mais de um papel (o padrão é `coordinator` + `profissional`), então testar
 autorização exige usuário com papel **exclusivo** — senão o resultado engana.
@@ -437,17 +449,33 @@ recorre junto ao convênio, parte do valor volta ("recursado"), e desse recursad
 efetivamente paga ("acatado"). Preenchimento 100% manual pela coordenação — nada disso vem de
 importação.
 
-`glosa_recursos` é **um registro por lote de glosa** (`glosa_batch_id` único) — não guarda
-histórico de reenvios, só o estado atual do recurso daquele lote. Campos digitados: `lote`
-(número do lote do recurso junto ao convênio — **não é** `glosa_items.lote`, que é o lote de
-faturamento original do item, coisa diferente), `valor_recursado`, `valor_acatado` e `status`
-(lista fechada por enquanto: Em Análise, Pagamento Efetuado — `App\Models\GlosaRecurso::STATUS_OPTIONS`).
+`glosa_recursos` permite **mais de um registro por lote de glosa** — raro (reenvio, nova
+tentativa), mas acontece, então `glosa_batch_id` não é único (era, até 28/08/2026; o unique
+saiu numa migration própria, criando o índice substituto antes de dropar o antigo, por causa
+da FK — ver "Armadilhas conhecidas"). `GlosaBatch::recursos()` é `hasMany`. Cada registro não
+guarda histórico de mudanças, só o estado atual daquele recurso específico. Campos digitados:
+`lote` (número do lote do recurso junto ao convênio — **não é** `glosa_items.lote`, que é o
+lote de faturamento original do item, coisa diferente), `valor_recursado`, `valor_acatado` e
+`status` (lista fechada por enquanto: Em Análise, Pagamento Efetuado —
+`App\Models\GlosaRecurso::STATUS_OPTIONS`).
 
-Os percentuais de conversão **não são gravados**: `% conversão recursado` = recursado / glosa
-do lote, `% conversão acatado` = acatado / recursado, calculados na tela
-(`Producao\Glosas\Recursos`). Período inicial/final (colunas que aparecem numa planilha de
-referência do time) ficaram de fora de propósito — não existe essa granularidade em
-`glosa_batches` hoje, e decidiu-se não adicionar.
+O formulário em `Producao\Glosas\Recursos` é um **repeater** — mesmo padrão das requisições
+complementares de CH em `Pacientes\CargaHoraria` (`terapias[]`/`adicionarTerapia()`): um lote
+abre com todos os recursos já registrados, "Adicionar recurso" inclui outra linha, e cada linha
+tem seu próprio "remover". Remover uma linha já gravada (tem `id`) **exclui de verdade** na
+hora, não espera o "Salvar" — mesma UX de `CargaHoraria::deleteRecord()`. A listagem soma os
+recursos de cada lote com `withSum()`/`withCount()`, nunca com `leftJoin` direto — um `leftJoin`
+multiplicaria as linhas de `glosa_batches` por recurso e contaria `vl_glosa` em dobro quando um
+lote tem mais de um recurso (mesma classe de bug do "BI antigo conta motivo em dobro", mais
+acima). Na tabela, lote com 0 recursos mostra "—" e botão "Registrar"; 1 recurso mostra os
+valores normalmente e "Editar"; mais de 1 soma os valores automaticamente e mostra "Vários (N)"
+/ "N recursos" com tooltip listando os lotes e status individuais, botão "Gerenciar".
+
+Os percentuais de conversão **não são gravados**: `% conversão recursado` = soma dos
+recursados / glosa do lote, `% conversão acatado` = soma dos acatados / soma dos recursados,
+calculados na tela. Período inicial/final (colunas que aparecem numa planilha de referência do
+time) ficaram de fora de propósito — não existe essa granularidade em `glosa_batches` hoje, e
+decidiu-se não adicionar.
 
 **Única tela de glosa que `administrative` acessa.** Relatórios Mensais continua
 `admin|manager`; Acompanhamento de Recursos é `admin|manager|administrative` — tanto na rota

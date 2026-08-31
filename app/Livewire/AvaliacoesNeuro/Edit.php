@@ -33,6 +33,12 @@ class Edit extends Component
 
     public function mount(NeuroAssessment $assessment)
     {
+        // Checagem própria: ação do Livewire não passa pelo middleware da rota
+        // (role:admin|manager|administrative|avaliador_neuro).
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative', 'avaliador_neuro'])) {
+            abort(403, 'Você não tem permissão para acessar Avaliações Neuro.');
+        }
+
         // SEGURANÇA (IDOR + dado sensível de saúde): NeuroAssessment não tem unit_id nem
         // global scope; o route model binding entregava a avaliação de QUALQUER clínica
         // só trocando o ID na URL. A unidade é derivada do paciente vinculado.

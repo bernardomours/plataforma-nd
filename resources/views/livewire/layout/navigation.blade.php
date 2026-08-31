@@ -105,7 +105,13 @@ new class extends Component
                             </svg>
                             Controle de CH
                         </a>
+                    @endhasanyrole
 
+                    {{-- avaliador_neuro: papel aditivo, para quem realiza avaliação na
+                         prática mesmo sem ser admin/manager (ex.: coordenador que também
+                         avalia). Por isso este link tem checagem própria, separada da
+                         de Controle de CH acima. --}}
+                    @hasanyrole('admin|manager|avaliador_neuro')
                         <a href="{{ route('avaliacoes-neuro.index') }}" wire:navigate class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
                             <svg class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -372,7 +378,11 @@ new class extends Component
                             </svg>
                             Controle de CH
                         </a>
+                    @endhasanyrole
 
+                    {{-- avaliador_neuro: papel aditivo, checagem própria (ver bloco
+                         irmão acima, no menu desktop, para o motivo). --}}
+                    @hasanyrole('admin|manager|administrative|avaliador_neuro')
                         <a href="{{ route('avaliacoes-neuro.index') }}" wire:navigate class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }} group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
                             <svg class="{{ request()->routeIs('avaliacoes-neuro.*') ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500' }} mr-3 flex-shrink-0 h-5 w-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>

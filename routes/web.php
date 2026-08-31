@@ -68,17 +68,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin|manager|administrative')->group(function () {
         Route::get('/terapias-realizadas/cadastrar', TerapiasRealizadasCreate::class)->name('terapias-realizadas.create');
         Route::get('/terapias-realizadas/{id}/editar', TerapiasRealizadasEdit::class)->name('terapias-realizadas.edit');
-        Route::get('/avaliacoes-neuro/registrar', AvaliacoesNeuroCreate::class)->name('avaliacoes-neuro.create');
-        Route::get('/avaliacoes-neuro/{assessment}/diario', AvaliacoesNeuroEdit::class)->name('avaliacoes-neuro.edit');
         Route::get('/profissionais', ProfissionaisIndex::class)->name('profissionais.index');
         Route::get('/profissionais/cadastrar', ProfissionaisCreate::class)->name('profissionais.create');
         Route::get('/profissionais/{professional}/editar', ProfissionaisEdit::class)->name('profissionais.edit');
         Route::get('/solicitacao-ch', ChPendencias::class)->name('ch.solicitacao');
     });
 
+    // Avaliações Neuro tem grupo próprio porque o papel extra 'avaliador_neuro' é
+    // aditivo e específico desta ferramenta — não deve valer para as demais rotas do
+    // grupo "FREQUENCIA" acima (Profissionais, Solicitação de CH etc).
+    Route::middleware('role:admin|manager|administrative|avaliador_neuro')->group(function () {
+        Route::get('/avaliacoes-neuro/registrar', AvaliacoesNeuroCreate::class)->name('avaliacoes-neuro.create');
+        Route::get('/avaliacoes-neuro/{assessment}/diario', AvaliacoesNeuroEdit::class)->name('avaliacoes-neuro.edit');
+    });
+
     Route::middleware('role:admin|manager')->group(function () {
         Route::get('/relatorio-geral', RelatorioGeral::class)->name('relatorios.geral');
         Route::get('/ch-solicitada', ChSolicitadaIndex::class)->name('ch-solicitada.index');
+    });
+
+    Route::middleware('role:admin|manager|avaliador_neuro')->group(function () {
         Route::get('/avaliacoes-neuro', AvaliacoesNeuroIndex::class)->name('avaliacoes-neuro.index');
     });
 

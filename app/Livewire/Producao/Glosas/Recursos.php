@@ -11,8 +11,10 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 /**
- * Acompanhamento manual do recurso de glosa: lote, valor recursado, valor acatado e status,
- * um registro por lote de glosa (glosa_batches). Preenchido por admin, manager ou
+ * Acompanhamento manual do recurso de glosa: lote, valor recursado, valor acatado e status.
+ * Um lote de glosa (glosa_batches) pode ter mais de um recurso — raro, mas acontece (reenvio,
+ * nova tentativa) — por isso o formulário é um repeater, mesmo padrão das requisições
+ * complementares de CH em Pacientes\CargaHoraria. Preenchido por admin, manager ou
  * administrative — a única tela de glosas que administrative acessa; Relatórios Mensais
  * continua admin|manager.
  */
@@ -28,10 +30,7 @@ class Recursos extends Component
 
     public bool $isModalOpen = false;
     public ?int $editingBatchId = null;
-    public string $lote = '';
-    public string $valor_recursado = '';
-    public string $valor_acatado = '';
-    public string $modal_status = '';
+    public array $recursosForm = [];
 
     public function mount()
     {
@@ -91,34 +90,37 @@ class Recursos extends Component
                         ->orWhere('prestador_codigo', 'like', $termo);
                 });
             })
-            ->when($this->status === 'sem_registro', fn ($q) => $q->doesntHave('recurso'))
+            ->when($this->status === 'sem_registro', fn ($q) => $q->doesntHave('recursos'))
             ->when(
                 array_key_exists($this->status, GlosaRecurso::STATUS_OPTIONS),
-                fn ($q) => $q->whereHas('recurso', fn ($r) => $r->where('status', $this->status))
+                fn ($q) => $q->whereHas('recursos', fn ($r) => $r->where('status', $this->status))
             );
     }
 
     private function kpis(): array
     {
-        $r = $this->escopoPagina()
-            ->leftJoin('glosa_recursos', 'glosa_recursos.glosa_batch_id', '=', 'glosa_batches.id')
-            ->selectRaw('
-                COUNT(*) as total_lotes,
-                COALESCE(SUM(glosa_batches.vl_glosa), 0) as total_glosado,
-                COALESCE(SUM(glosa_recursos.valor_recursado), 0) as total_recursado,
-                COALESCE(SUM(glosa_recursos.valor_acatado), 0) as total_acatado,
-                COALESCE(SUM(CASE WHEN glosa_recursos.id IS NULL THEN 1 ELSE 0 END), 0) as sem_recurso
-            ')
+        $idsNoEscopo = $this->escopoPagina()->pluck('glosa_batches.id');
+
+        $totalGlosado = $this->escopoPagina()->sum('vl_glosa');
+        $semRecurso = $this->escopoPagina()->doesntHave('recursos')->count();
+
+        // Soma direto em glosa_recursos, filtrando pelos ids do escopo — evita o fan-out
+        // de somar glosa_batches.vl_glosa via join quando um lote tem mais de um recurso.
+        $agregado = GlosaRecurso::whereIn('glosa_batch_id', $idsNoEscopo)
+            ->selectRaw('COALESCE(SUM(valor_recursado),0) as total_recursado, COALESCE(SUM(valor_acatado),0) as total_acatado')
             ->first();
 
+        $totalRecursado = (float) $agregado->total_recursado;
+        $totalAcatado = (float) $agregado->total_acatado;
+
         return [
-            'total_lotes'         => (int) $r->total_lotes,
-            'sem_recurso'         => (int) $r->sem_recurso,
-            'total_glosado'       => (float) $r->total_glosado,
-            'total_recursado'     => (float) $r->total_recursado,
-            'total_acatado'       => (float) $r->total_acatado,
-            'conversao_recursado' => $r->total_glosado > 0 ? $r->total_recursado / $r->total_glosado * 100 : 0,
-            'conversao_acatado'   => $r->total_recursado > 0 ? $r->total_acatado / $r->total_recursado * 100 : 0,
+            'total_lotes'         => $idsNoEscopo->count(),
+            'sem_recurso'         => $semRecurso,
+            'total_glosado'       => (float) $totalGlosado,
+            'total_recursado'     => $totalRecursado,
+            'total_acatado'       => $totalAcatado,
+            'conversao_recursado' => $totalGlosado > 0 ? $totalRecursado / $totalGlosado * 100 : 0,
+            'conversao_acatado'   => $totalRecursado > 0 ? $totalAcatado / $totalRecursado * 100 : 0,
         ];
     }
 
@@ -126,24 +128,63 @@ class Recursos extends Component
     {
         $this->autorizarAcesso();
 
-        $batch = $this->escopoUnidade()->with('recurso')->findOrFail($batchId);
+        $batch = $this->escopoUnidade()->with('recursos')->findOrFail($batchId);
 
         $this->editingBatchId = $batch->id;
-        $this->lote = $batch->recurso->lote ?? '';
-        $this->valor_recursado = $batch->recurso && $batch->recurso->valor_recursado !== null
-            ? (string) $batch->recurso->valor_recursado : '';
-        $this->valor_acatado = $batch->recurso && $batch->recurso->valor_acatado !== null
-            ? (string) $batch->recurso->valor_acatado : '';
-        $this->modal_status = $batch->recurso->status ?? '';
+        $this->recursosForm = $batch->recursos->map(fn ($r) => [
+            'id'              => $r->id,
+            'lote'            => $r->lote ?? '',
+            'valor_recursado' => $r->valor_recursado !== null ? (string) $r->valor_recursado : '',
+            'valor_acatado'   => $r->valor_acatado !== null ? (string) $r->valor_acatado : '',
+            'status'          => $r->status ?? '',
+        ])->all();
+
+        if (empty($this->recursosForm)) {
+            $this->adicionarLinhaRecurso();
+        }
 
         $this->resetValidation();
         $this->isModalOpen = true;
     }
 
+    public function adicionarLinhaRecurso()
+    {
+        $this->recursosForm[] = [
+            'id' => null, 'lote' => '', 'valor_recursado' => '', 'valor_acatado' => '', 'status' => '',
+        ];
+    }
+
+    public function removerLinhaRecurso(int $index)
+    {
+        $this->autorizarAcesso();
+
+        $linha = $this->recursosForm[$index] ?? null;
+
+        if ($linha === null) {
+            return;
+        }
+
+        if (! empty($linha['id'])) {
+            // Confirma que o lote continua no escopo permitido antes de excluir.
+            $this->escopoUnidade()->findOrFail($this->editingBatchId);
+
+            GlosaRecurso::where('id', $linha['id'])
+                ->where('glosa_batch_id', $this->editingBatchId)
+                ->delete();
+        }
+
+        unset($this->recursosForm[$index]);
+        $this->recursosForm = array_values($this->recursosForm);
+
+        if (empty($this->recursosForm)) {
+            $this->adicionarLinhaRecurso();
+        }
+    }
+
     public function fecharModal()
     {
         $this->isModalOpen = false;
-        $this->reset(['editingBatchId', 'lote', 'valor_recursado', 'valor_acatado', 'modal_status']);
+        $this->reset(['editingBatchId', 'recursosForm']);
         $this->resetValidation();
     }
 
@@ -152,34 +193,51 @@ class Recursos extends Component
         $this->autorizarAcesso();
 
         $this->validate([
-            'lote'            => 'nullable|string|max:30',
-            'valor_recursado' => 'nullable|numeric|min:0',
-            'valor_acatado'   => 'nullable|numeric|min:0',
-            'modal_status'    => ['nullable', Rule::in(array_keys(GlosaRecurso::STATUS_OPTIONS))],
+            'recursosForm.*.lote'            => 'nullable|string|max:30',
+            'recursosForm.*.valor_recursado' => 'nullable|numeric|min:0',
+            'recursosForm.*.valor_acatado'   => 'nullable|numeric|min:0',
+            'recursosForm.*.status'          => ['nullable', Rule::in(array_keys(GlosaRecurso::STATUS_OPTIONS))],
         ]);
 
-        if ($this->valor_acatado !== '' && $this->valor_recursado !== ''
-            && (float) $this->valor_acatado > (float) $this->valor_recursado) {
-            $this->addError('valor_acatado', 'O valor acatado não pode ser maior que o valor recursado.');
+        foreach ($this->recursosForm as $i => $linha) {
+            if ($linha['valor_acatado'] !== '' && $linha['valor_recursado'] !== ''
+                && (float) $linha['valor_acatado'] > (float) $linha['valor_recursado']) {
+                $this->addError("recursosForm.$i.valor_acatado", 'O valor acatado não pode ser maior que o valor recursado.');
+            }
+        }
 
+        if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
 
         // Reconfirma que o lote está no escopo permitido do usuário — mesma proteção de
-        // IDOR já usada em outras telas do Livewire (a checagem em abrirModal não é
-        // redundante com esta: o payload de salvar() chega direto, sem reabrir o modal).
+        // IDOR já usada em outras telas do Livewire.
         $batch = $this->escopoUnidade()->findOrFail($this->editingBatchId);
 
-        GlosaRecurso::updateOrCreate(
-            ['glosa_batch_id' => $batch->id],
-            [
-                'lote'            => $this->lote !== '' ? $this->lote : null,
-                'valor_recursado' => $this->valor_recursado !== '' ? $this->valor_recursado : null,
-                'valor_acatado'   => $this->valor_acatado !== '' ? $this->valor_acatado : null,
-                'status'          => $this->modal_status !== '' ? $this->modal_status : null,
+        foreach ($this->recursosForm as $linha) {
+            $vazia = $linha['lote'] === '' && $linha['valor_recursado'] === ''
+                && $linha['valor_acatado'] === '' && $linha['status'] === '';
+
+            // Linha em branco que nunca existiu: não cria registro vazio.
+            if ($vazia && empty($linha['id'])) {
+                continue;
+            }
+
+            $dados = [
+                'glosa_batch_id'  => $batch->id,
+                'lote'            => $linha['lote'] !== '' ? $linha['lote'] : null,
+                'valor_recursado' => $linha['valor_recursado'] !== '' ? $linha['valor_recursado'] : null,
+                'valor_acatado'   => $linha['valor_acatado'] !== '' ? $linha['valor_acatado'] : null,
+                'status'          => $linha['status'] !== '' ? $linha['status'] : null,
                 'registered_by'   => auth()->id(),
-            ]
-        );
+            ];
+
+            if (! empty($linha['id'])) {
+                GlosaRecurso::where('id', $linha['id'])->where('glosa_batch_id', $batch->id)->update($dados);
+            } else {
+                GlosaRecurso::create($dados);
+            }
+        }
 
         $this->fecharModal();
     }
@@ -197,7 +255,10 @@ class Recursos extends Component
         return view('livewire.producao.glosas.recursos', [
             'kpis'              => $this->kpis(),
             'lotes'             => $this->escopoLista()
-                                    ->with('recurso')
+                                    ->withCount('recursos')
+                                    ->withSum('recursos', 'valor_recursado')
+                                    ->withSum('recursos', 'valor_acatado')
+                                    ->with('recursos')
                                     ->orderByDesc('competencia')
                                     ->orderBy('prestador_nome')
                                     ->paginate(15),

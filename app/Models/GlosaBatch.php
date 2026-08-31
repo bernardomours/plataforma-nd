@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class GlosaBatch extends Model
 {
@@ -27,9 +26,11 @@ class GlosaBatch extends Model
         return $this->hasMany(GlosaItem::class);
     }
 
-    public function recurso(): HasOne
+    // Raro, mas um lote pode ter mais de um recurso (reenvio, nova tentativa) —
+    // por isso hasMany, não hasOne. Ver Producao\Glosas\Recursos para a agregação.
+    public function recursos(): HasMany
     {
-        return $this->hasOne(GlosaRecurso::class);
+        return $this->hasMany(GlosaRecurso::class);
     }
 
     public function unit(): BelongsTo
