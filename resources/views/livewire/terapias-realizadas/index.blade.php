@@ -368,8 +368,66 @@
                 </thead>
                 <tbody class="divide-y" style="--tw-divide-opacity: 1; border-color: var(--line)">
                     @forelse ($appointments as $appointment)
-                        <tr class="whitespace-nowrap transition-colors hover:bg-gray-50" style="border-color: var(--line)">
-                            @if($selectedColumns['nome']) <td class="px-4 py-3 font-medium" style="color: var(--ink)">{{ $appointment->patient?->name }}</td> @endif
+                        @php
+                            // Mesma sinalização de "Auditoria de Atendimentos" (Producao\AtendimentosRealizados),
+                            // pra profissional ter noção do que está certo/errado no próprio histórico. Usa a
+                            // regra canônica de duração (CLAUDE.md / Create|Edit::calculateSessions()): Humana
+                            // sempre 40min; ABA fora da Humana, 60min; demais terapias, 40min.
+                            $semCheckout = ! $appointment->check_out;
+                            $duracaoInsuficiente = false;
+                            $motivoAlerta = '';
+
+                            if ($semCheckout) {
+                                $motivoAlerta = 'Sem check-out registrado.';
+                            } elseif ($appointment->check_in) {
+                                $inicioAtend = \Carbon\Carbon::parse($appointment->check_in);
+                                $fimAtend = \Carbon\Carbon::parse($appointment->check_out);
+
+                                if ($fimAtend->greaterThan($inicioAtend)) {
+                                    $minutosReais = (int) $inicioAtend->diffInMinutes($fimAtend);
+                                    $qtdSessoesAtend = $appointment->session_number ?? 1;
+
+                                    $nomeConvenioAtend = $appointment->agreement?->name ?? $appointment->patient?->agreement?->name;
+                                    $isHumanaAtend = $nomeConvenioAtend === 'Humana';
+                                    $isAbaAtend = $appointment->therapy?->name === 'ABA';
+                                    $duracaoIdealPorSessao = $isHumanaAtend ? 40 : ($isAbaAtend ? 60 : 40);
+
+                                    $minutosMinimosEsperados = max(0, ($qtdSessoesAtend * $duracaoIdealPorSessao) - 10);
+
+                                    if ($minutosReais < $minutosMinimosEsperados) {
+                                        $duracaoInsuficiente = true;
+                                        $motivoAlerta = sprintf(
+                                            'Duração de %02d:%02d registrada para %d sessão(ões) — mínimo esperado %02d:%02d.',
+                                            intdiv($minutosReais, 60), $minutosReais % 60,
+                                            $qtdSessoesAtend,
+                                            intdiv($minutosMinimosEsperados, 60), $minutosMinimosEsperados % 60
+                                        );
+                                    }
+                                }
+                            }
+
+                            $temAlerta = $semCheckout || $duracaoInsuficiente;
+                        @endphp
+                        <tr class="whitespace-nowrap transition-colors {{ $temAlerta ? '' : 'hover:bg-gray-50' }}"
+                            style="border-color: var(--line); {{ $temAlerta ? 'background: var(--danger-soft);' : '' }}"
+                            @if($temAlerta) title="{{ $motivoAlerta }}" @endif>
+                            @if($selectedColumns['nome'])
+                                <td class="px-4 py-3 font-medium" style="color: var(--ink)">
+                                    <div class="flex items-center gap-2">
+                                        @if($temAlerta)
+                                            <span class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                                                  style="background: var(--danger-soft); color: var(--danger-strong); border: 1px solid #fecaca"
+                                                  title="{{ $motivoAlerta }}">
+                                                <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                                                </svg>
+                                                {{ $semCheckout ? 'Sem check-out' : 'Tempo Insuficiente' }}
+                                            </span>
+                                        @endif
+                                        <span>{{ $appointment->patient?->name }}</span>
+                                    </div>
+                                </td>
+                            @endif
                             @if($selectedColumns['data']) <td class="px-4 py-3" style="color: var(--ink-2)">{{ $appointment->appointment_date ? \Carbon\Carbon::parse($appointment->appointment_date)->format('d/m/Y') : '-' }}</td> @endif
                             @if($selectedColumns['guia']) <td class="px-4 py-3 nd-num" style="color: var(--ink-2)">{{ $appointment->guide ?? '-' }}</td> @endif
                             @if($selectedColumns['terapia']) <td class="px-4 py-3" style="color: var(--ink-2)">{{ $appointment->therapy?->name }}</td> @endif

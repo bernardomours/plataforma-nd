@@ -37,6 +37,10 @@ class Appointment extends Model
         // atendimento ocorre fora do convênio/unidade habituais.
         'agreement_id',
         'unit_id',
+        // Horário fixo de origem, quando o atendimento nasce da Agenda Diária da Recepção
+        // ("Sinalizar Realizada") — null pro lançamento manual/importação, que não tem
+        // horário fixo por trás. Ver migration add_schedule_id_to_appointments_table.
+        'schedule_id',
     ];
 
     /**
@@ -101,5 +105,10 @@ class Appointment extends Model
     public function serviceType(): BelongsTo
     {
         return $this->belongsTo(ServiceType::class);
+    }
+
+    public function schedule(): BelongsTo
+    {
+        return $this->belongsTo(Schedule::class);
     }
 }

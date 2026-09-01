@@ -68,6 +68,8 @@
                                 'coordinator' => 'Coordenação',
                                 'supervisor' => 'Supervisão',
                                 'profissional' => 'Profissional',
+                                'recepcao' => 'Recepção',
+                                'avaliador_neuro' => 'Avaliador Neuro',
                             ];
                         @endphp
                         

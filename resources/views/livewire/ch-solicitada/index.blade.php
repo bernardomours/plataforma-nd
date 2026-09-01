@@ -318,6 +318,7 @@
                             <th class="py-4 px-4 text-center">Realizadas</th>
                             <th class="py-4 px-4 text-center bg-gray-50">Aderência</th>
                             <th class="py-4 px-4 text-center bg-gray-50">Falta (sessões)</th>
+                            <th class="py-4 px-4 text-center bg-gray-50">Faltas</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-800">
@@ -404,11 +405,27 @@
                                         <span class="text-xs font-semibold text-green-600">Em dia</span>
                                     @endif
                                 </td>
+
+                                {{-- Faltas registradas (com motivo) — coluna própria, separada do número
+                                     acima: aquele é a diferença planejado-realizado, este é o histórico. --}}
+                                <td class="py-4 px-4 text-center bg-gray-50/50">
+                                    @php $qtdFaltasRegistradas = $this->contarFaltasRegistradas($registro); @endphp
+                                    @if($qtdFaltasRegistradas > 0)
+                                        <button type="button"
+                                                wire:click="abrirModalFaltas({{ $registro->patient_id }}, {{ $registro->therapy_id }}, '{{ $registro->month_year }}')"
+                                                class="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100">
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            Visualizar Faltas
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-gray-300">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                {{-- colspan corrigido: eram 10 colunas com colspan=9, agora são 12 --}}
-                                <td colspan="12" class="py-12">
+                                {{-- colspan corrigido: eram 10 colunas com colspan=9, agora são 13 (+ coluna Faltas) --}}
+                                <td colspan="13" class="py-12">
                                     <div class="flex flex-col items-center justify-center text-gray-500 w-full">
                                         <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
@@ -424,6 +441,55 @@
 
             <div class="py-3 px-4 border-t border-gray-200">
                 {{ $registros->links() }}
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: Faltas do mês --}}
+    <div x-data="{ open: @entangle('isModalFaltasOpen') }" x-show="open" x-cloak
+         @keydown.escape.window="open && $wire.fecharModalFaltas()"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div x-show="open" x-transition.opacity @click="$wire.fecharModalFaltas()" class="absolute inset-0 bg-gray-900/50"></div>
+
+        <div x-show="open" x-transition:enter="ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+             class="relative w-full max-w-lg overflow-hidden rounded-xl bg-white text-left shadow-xl border border-gray-200">
+            <div class="p-6">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+                            <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-900">Faltas registradas no mês</h3>
+                            <p class="mt-0.5 text-sm text-gray-500">{{ $pacienteDoModal }} · {{ $terapiaDoModal }}</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="fecharModalFaltas" class="text-gray-400 hover:text-gray-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="max-h-80 space-y-2 overflow-y-auto">
+                    @forelse($faltasDoModal as $falta)
+                        <div class="rounded-lg border border-red-100 bg-red-50/60 p-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-bold text-gray-900">{{ \Carbon\Carbon::parse($falta->date)->format('d/m/Y') }}</span>
+                                <span class="inline-flex items-center rounded bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700">{{ $falta->motivoLabel() }}</span>
+                            </div>
+                            @if($falta->observacao)
+                                <p class="mt-1.5 text-xs text-gray-600">{{ $falta->observacao }}</p>
+                            @endif
+                            <div class="mt-2 space-y-0.5 border-t border-red-100 pt-1.5 text-[10px] text-gray-500">
+                                <p><span class="font-semibold text-gray-600">Registrado por:</span> {{ $falta->registeredBy?->name ?? 'Sistema' }}</p>
+                                @if($falta->professional)
+                                    <p><span class="font-semibold text-gray-600">Profissional do atendimento:</span> {{ $falta->professional->name }}</p>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <p class="py-6 text-center text-sm text-gray-400">Nenhuma falta com motivo registrado neste mês.</p>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>

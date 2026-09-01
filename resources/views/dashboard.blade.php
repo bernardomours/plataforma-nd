@@ -13,7 +13,18 @@
                 </div>
             </div>
 
-            @hasanyrole('admin|manager|administrative|coordinator|supervisor')
+            {{-- Agenda Diária: página inicial exclusiva da recepção — ninguém mais vê
+                 esta seção, nem quem também é 'administrative'. --}}
+            @role('recepcao')
+                <div>
+                    <div class="mb-3">
+                        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Agenda Diária</h2>
+                    </div>
+                    <livewire:recepcao.agenda-diaria />
+                </div>
+            @endrole
+
+            @hasanyrole('manager|coordinator|supervisor')
                 <div>
                     <livewire:dashboard.alertas-pendentes />
                 </div>

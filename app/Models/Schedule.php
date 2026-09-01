@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -86,5 +87,30 @@ class Schedule extends Model
     public function serviceType(): BelongsTo
     {
         return $this->belongsTo(ServiceType::class);
+    }
+
+    /** Atendimentos lançados a partir deste horário fixo (via Agenda Diária da Recepção). */
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    /** Faltas registradas para este horário fixo. */
+    public function faltas(): HasMany
+    {
+        return $this->hasMany(Falta::class);
+    }
+
+    /**
+     * [nome, nome-sem-acento] do dia da semana de uma data — mesmo par usado pra casar
+     * com day_of_week (que na base aparece tanto "terça" quanto "terca"). Centraliza o
+     * que antes só existia duplicado dentro de Profissionais\MinhaAgenda.
+     */
+    public static function nomesDoDiaDaSemana(\Carbon\CarbonInterface $data): array
+    {
+        $dias = [0 => 'domingo', 1 => 'segunda', 2 => 'terça', 3 => 'quarta', 4 => 'quinta', 5 => 'sexta', 6 => 'sábado'];
+        $nome = $dias[$data->dayOfWeek];
+
+        return [$nome, str_replace('ç', 'c', $nome)];
     }
 }

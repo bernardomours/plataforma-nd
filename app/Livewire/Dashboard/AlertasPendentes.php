@@ -15,6 +15,19 @@ class AlertasPendentes extends Component
     public $visitaSelecionadaId = null;
     public $visitaSelecionadaInfo = [];
 
+    /**
+     * Widget "Gestão e Alertas" — visível só pra manager|coordinator|supervisor
+     * (dashboard.blade.php também esconde o bloco, mas esse componente tem uma ação de
+     * escrita, excluirVisita(), que não tinha checagem nenhuma; mesmo motivo de sempre,
+     * ação do Livewire não passa pelo middleware da rota).
+     */
+    public function mount()
+    {
+        if (! auth()->user()->hasAnyRole(['manager', 'coordinator', 'supervisor'])) {
+            abort(403, 'Você não tem permissão para acessar este painel.');
+        }
+    }
+
     public function abrirOpcoes($id)
     {
         $visita = Visit::with(['patient'])->find($id);

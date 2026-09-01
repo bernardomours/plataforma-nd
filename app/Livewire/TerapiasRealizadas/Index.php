@@ -62,8 +62,9 @@ class Index extends Component
         // teve saída registrada (soft delete), então removemos SOMENTE o SoftDeletingScope
         // e mantemos o isolamento por unidade ativo. Mesmo raciocínio nas ocorrências abaixo.
         $query = Appointment::with([
-            'patient' => fn($q) => $q->withoutGlobalScope(SoftDeletingScope::class),
+            'patient' => fn($q) => $q->withoutGlobalScope(SoftDeletingScope::class)->with('agreement'),
             'therapy',
+            'agreement',
         ]);
 
         $allowedUnitIds = auth()->user()->getAllowedUnitIds();

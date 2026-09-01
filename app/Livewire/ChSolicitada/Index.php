@@ -9,6 +9,7 @@ use App\Models\RequestedService;
 use App\Models\Unit;
 use App\Models\Agreement;
 use App\Models\Therapy;
+use App\Models\Falta;
 use Illuminate\Support\Facades\DB;
 
 #[Layout('layouts.app')]
@@ -31,6 +32,12 @@ class Index extends Component
 
     public $units = [];
     public $availableYears = [];
+
+    // Modal "Faltas do mês" — detalha o motivo por trás do número de "Falta (sessões)".
+    public bool $isModalFaltasOpen = false;
+    public $faltasDoModal = [];
+    public $pacienteDoModal = '';
+    public $terapiaDoModal = '';
 
 
     public const FAIXAS = [
@@ -384,6 +391,51 @@ class Index extends Component
         }
 
         return max(0, $planejada - (float) $registro->realized_sessions);
+    }
+
+    /**
+     * Conta as faltas REGISTRADAS (com motivo) pra esse paciente+terapia na competência
+     * da linha — não é o mesmo número de faltaDaLinha() (aquele é a diferença numérica
+     * planejado-realizado; este é quantas dessas faltas já têm explicação registrada).
+     * Uma query por linha renderizada (até 15/página) é aceitável pelo índice dedicado
+     * (faltas_patient_therapy_date_index).
+     */
+    public function contarFaltasRegistradas($registro): int
+    {
+        if (! $registro->month_year) {
+            return 0;
+        }
+
+        return Falta::where('patient_id', $registro->patient_id)
+            ->where('therapy_id', $registro->therapy_id)
+            ->whereYear('date', \Carbon\Carbon::parse($registro->month_year)->year)
+            ->whereMonth('date', \Carbon\Carbon::parse($registro->month_year)->month)
+            ->count();
+    }
+
+    public function abrirModalFaltas($patientId, $therapyId, $monthYear): void
+    {
+        $mes = \Carbon\Carbon::parse($monthYear);
+
+        $faltas = Falta::with(['registeredBy', 'professional'])
+            ->where('patient_id', $patientId)
+            ->where('therapy_id', $therapyId)
+            ->whereYear('date', $mes->year)
+            ->whereMonth('date', $mes->month)
+            ->orderByDesc('date')
+            ->get();
+
+        $primeira = $faltas->first();
+        $this->pacienteDoModal = $primeira?->patient?->name ?? '';
+        $this->terapiaDoModal = $primeira?->therapy?->name ?? '';
+        $this->faltasDoModal = $faltas;
+        $this->isModalFaltasOpen = true;
+    }
+
+    public function fecharModalFaltas(): void
+    {
+        $this->isModalFaltasOpen = false;
+        $this->reset(['faltasDoModal', 'pacienteDoModal', 'terapiaDoModal']);
     }
 
     public function faixaDaLinha($registro): ?string

@@ -193,6 +193,20 @@ Conferido contra ~57 mil atendimentos: bate em 94–99% conforme o grupo.
 Implementada em `PlannedSessionsFromSchedule::duracaoDaSessao()` e replicada em
 `TerapiasRealizadas\Create|Edit::calculateSessions()`.
 
+**Sinalização de incoerência (01/09/2026).** `TerapiasRealizadas\Index` marca a linha
+(fundo `--danger-soft` + badge "Sem check-out"/"Tempo baixo" na célula do nome, com o
+motivo completo no `title` nativo — funciona mesmo dentro do `overflow-x-auto`, ver
+"Armadilhas conhecidas") quando falta `check_out`, ou quando a duração real fica abaixo do
+mínimo esperado pra terapia/convênio daquele atendimento (regra desta seção, com 10 min de
+tolerância). Réplica da mesma sinalização que já existia em `Producao\AtendimentosRealizados`
+— lá o badge nunca chegou a aparecer de fato (o motivo era calculado e descartado sem
+`title` nem ícone, só a cor de fundo da linha mudava), e a regra de duração de lá era mais
+estreita (só testava `unimed + aba`, não Humana/ABA como esta seção documenta). Aqui usa a
+regra canônica da tabela acima, porque é a mesma tela que já implementa
+`calculateSessions()` com ela. Objetivo: dar noção ao profissional, na própria tela que ele
+usa, do que está certo e do que é potencialmente glosável — sem bloquear nada, é só sinal
+visual (não impede login nem cadastro).
+
 ### Sessões realizadas
 
 Vêm de `appointments.session_number`, gravado no lançamento e nas importações da Unimed
@@ -847,6 +861,87 @@ era do colega só pra trocar o `professional_id` pro dele mesmo. O dropdown de p
 
 ---
 
+## Agenda Diária da Recepção e registro de Faltas (01/09/2026)
+
+Duas frentes construídas juntas, porque uma depende da outra: dar à recepção uma tela pra
+lançar atendimento e falta no ato (em vez de recadastrar depois em Terapias Realizadas), e dar
+à coordenação o motivo por trás do número de "Falta (sessões)" que CH Solicitada já calculava.
+
+**Papel `recepcao`**, aditivo, mesmo padrão do `avaliador_neuro`: quem faz recepção continua
+`administrative` (mantém o resto do acesso que já tinha) e ganha `recepcao` a mais, pela tela de
+Usuários — nenhuma migration atribui a ninguém automaticamente. Antes desta mudança não havia
+*nenhuma* forma de distinguir recepção do resto do administrativo (RH, financeiro, controles
+internos) — todos eram literalmente o mesmo papel Spatie. Achado no levantamento: 3 contas têm
+"recep" no nome ou e-mail (`Recepção Santa Cruz`, `Recepção João Câmara`,
+`recepcaondmossoro@gmail.com`) e são a pista de quem provavelmente precisa do checkbox marcado —
+não foi marcado automaticamente por ninguém, fica a critério de quem administra usuários.
+
+**`schedule_id` em `appointments` e em `faltas`** (ambos nullable). Até aqui Schedule (grade
+fixa semanal) e Appointment (atendimento realizado) eram tabelas totalmente separadas, casadas
+só informalmente por paciente+profissional+terapia+dia — suficiente pro faturamento/CH, que
+agregam por mês, mas não pra Agenda Diária saber, num dia específico, se aquele horário da
+grade já foi resolvido. Continua `null` em todo atendimento das telas antigas (lançamento
+manual, importação CSV Unimed) — não tem, nem precisa ter, horário fixo de origem.
+
+**`faltas` fica fora de `appointments`** de propósito, mesmo raciocínio de `glosa_*` ficar fora
+de `appointments`: falta não é um atendimento que aconteceu, é o registro de que ele NÃO
+aconteceu — misturar contaminaria toda soma de sessões realizadas (`ChSolicitada` já teria que
+saber filtrar, e uma falta esquecida nesse filtro inflaria silenciosamente o realizado). Motivo
+é lista fechada (`Falta::MOTIVO_OPTIONS`): Viagem, Doença, Não informado, Outro (com
+`observacao` livre).
+
+**`App\Services\StatusAgendaDoDia`** é o único lugar que resolve "esse horário, nessa data, virou
+o quê" (pendente/realizado/falta) — usado tanto pela Agenda Diária da Recepção quanto por Minha
+Agenda do profissional, pra nunca divergir entre as duas telas. Sempre em lote (2 queries fixas
+via `whereIn`, não uma por horário) — a Agenda Diária pode listar a grade inteira da unidade
+num dia. `jaResolvido()` é chamado de novo no `salvarRealizado()`/`salvarFalta()` de cada tela,
+não só na exibição — protege contra corrida (duplo clique, duas abas) sem lock explícito.
+
+**Responsabilidade dividida, mas não exclusiva.** Sinalizar falta é papel do profissional (em
+Minha Agenda, no próprio dia); a recepção também pode registrar falta pela Agenda Diária, como
+reforço (paciente liga avisando, por exemplo) — as duas ações usam o mesmo modelo e o mesmo
+guard `jaResolvido()`, então não duplicam. Sinalizar atendimento realizado é só da recepção
+(cria o `Appointment` direto, com `schedule_id` vinculado); o profissional não tem esse botão em
+Minha Agenda, só vê o resultado como badge "Atendido" se a recepção já resolveu.
+
+**"Sinalizar Realizada" pré-preenche do Schedule, mas tudo é editável** — horário (padrão é o
+da grade, ajustável se rodou diferente) e profissional (padrão é o da grade, trocável em caso de
+substituição, sem alterar a grade fixa em si — é só *este* atendimento). `session_number` é
+sempre calculado, nunca digitado, pela mesma regra de `Duração da sessão` (Humana 40min, ABA
+fora da Humana 60min, demais 40min) — 3ª réplica dessa regra no sistema (as outras duas:
+`PlannedSessionsFromSchedule::duracaoDaSessao()` e `TerapiasRealizadas\Create|Edit`); replicada
+de propósito, não extraída, seguindo o padrão que o projeto já usa pra essa regra específica.
+`agreement_id`/`unit_id` vêm do paciente, mesmo comportamento padrão de Terapias Realizadas.
+
+**Unimed é só visualização na Agenda Diária, não fica de fora.** O convênio já entrega
+relatório próprio com check-in/check-out e profissional definidos (o mesmo relatório que
+alimenta `glosas:importar`), então esses atendimentos não passam por "Sinalizar
+Realizada"/"Falta" — só gerariam trabalho duplicado. Mas a chefia pediu que a recepção ainda
+enxergasse esses pacientes na grade do dia, só pra ter noção de quem está previsto (sem poder
+agir sobre eles) — v1 excluía Unimed inteiramente da consulta, e foi trocado por um filtro de
+convênio multi-seleção (`$filtro_agreement_ids`) com Unimed **desmarcado por padrão**,
+preservando o comportamento antigo até alguém marcar o checkbox de propósito.
+
+Card de paciente Unimed mostra o mesmo horário/nome/terapia, mas com selo "UNIMED", borda
+neutra, e no lugar dos botões de ação um aviso fixo "Consulte o relatório Unimed" — a mesma
+regra vale mesmo se alguém tentar forjar a requisição do Livewire: `autorizarSchedule()`
+verifica `ehUnimed()` e aborta com 403 antes de deixar abrir qualquer modal ou salvar
+Appointment/Falta pra um paciente Unimed, então esconder o botão não é a única trava. Paciente
+sem convênio cadastrado (`agreement_id` nulo) sempre aparece, independente do filtro. O placar
+do topo (pendente/atendido/falta) não conta Unimed — só é "pendência de recepção" quem
+realmente passa por esta tela; Unimed tem sua própria pílula neutra ("N Unimed (visualização)").
+
+**CH Solicitada ganhou o ícone de detalhe** na coluna "Falta (sessões)": clicável só quando
+existe pelo menos uma `Falta` registrada pro paciente+terapia+competência daquela linha, abre
+modal com data, motivo, observação e quem registrou. Não é o mesmo número — `faltaDaLinha()`
+continua sendo a diferença numérica planejado-realizado (não muda), o ícone só mostra quantas
+dessas faltas já têm explicação por trás. Pode haver mais ou menos faltas registradas do que o
+número de sessões faltando (paciente cancela mais de uma sessão no mesmo dia bloqueado, ou falta
+sem que ninguém tenha registrado ainda) — o ícone só aparece quando há pelo menos um registro,
+não tenta bater exatamente com o número ao lado.
+
+---
+
 ## Armadilhas conhecidas
 
 **Blade grudado em palavra.** `Manual@if(...)` não compila a diretiva (exige que não haja
@@ -909,6 +1004,17 @@ para fora do filtro pretendido.
   se confirma na tela.
 - Testes que gravam devem rodar em transação com rollback: a suíte PHPUnit está quebrada
   (migrations falham no sqlite) e os testes são feitos via tinker contra o banco local.
+
+---
+
+## Widget "Gestão e Alertas" (01/09/2026)
+
+Visibilidade restrita a `manager|coordinator|supervisor` (era `admin|manager|administrative|
+coordinator|supervisor`) — pedido do usuário. `Dashboard\AlertasPendentes::excluirVisita()`
+não tinha checagem nenhuma até aqui (excluía qualquer `Visit` só com o ID, sem exigir papel
+algum); ganhou `mount()` com o mesmo guard, fechando a falha e reforçando a restrição de
+visibilidade — o widget nunca chega a montar pra quem não tem um dos três papéis, então nem
+o esconderijo do blade fica sozinho segurando a porta.
 
 ---
 
