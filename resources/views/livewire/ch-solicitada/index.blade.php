@@ -366,7 +366,7 @@
                                 <td class="py-4 px-4 text-center">
                                     @if($planejadaLinha > 0)
                                         <span class="font-semibold">{{ number_format($planejadaLinha, 0, ',', '.') }}</span>
-                                        <span class="block text-[10px] text-gray-400 font-normal">{{ rtrim(rtrim($registro->planned_hours, '0'), '.') }}/semana</span>
+                                        <span class="block text-[10px] text-gray-400 font-normal">{{ rtrim(rtrim(number_format($registro->planned_weekly ?? 0, 2, '.', ''), '0'), '.') }}/semana</span>
                                     @else
                                         <span class="text-gray-300">—</span>
                                     @endif

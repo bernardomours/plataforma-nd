@@ -25,14 +25,14 @@
                 <h3 class="text-lg font-bold text-gray-900 uppercase">Quadro de Horários Fixos</h3>
                 <p class="text-sm text-gray-500 mt-1">Acompanhamento da agenda semanal do paciente.</p>
             </div>
-            @hasanyrole('admin|manager|administrative|coordinator|supervisor')
+            @if($podeGerenciarAgenda)
                 <div>
                     <button wire:click="openModal" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition shadow-sm flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         Novo Horário
                     </button>
                 </div>
-            @endhasanyrole
+            @endif
         </div>
 
         <!-- Grid de Semanas -->
@@ -47,7 +47,8 @@
                 ];
             @endphp
 
-            <div class="grid grid-cols-5 divide-x divide-gray-200 border-b border-gray-200">
+            <div class="overflow-x-auto">
+            <div class="grid grid-cols-5 divide-x divide-gray-200 border-b border-gray-200 min-w-[700px]">
                 @foreach ($daysOfWeek as $key => $dayName)
                     <div>
                         <div class="py-3 px-4 bg-gray-50 border-b border-gray-200">
@@ -71,7 +72,7 @@
                                         <p class="text-xs text-gray-600 mt-1 truncate">{{ $schedule->professional?->name ?? 'N/A' }}</p>
                                     </div>
 
-                                    @hasanyrole('admin|manager|administrative|coordinator|supervisor')
+                                    @if($this->podeEditarSchedule($schedule))
                                         <div class="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button wire:click="editSchedule({{ $schedule->id }})" class="text-orange-500 hover:text-orange-700 bg-white border border-gray-200 rounded-md p-1 shadow-sm transition-colors" title="Editar Horário">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
@@ -80,7 +81,7 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                             </button>
                                         </div>
-                                    @endhasanyrole
+                                    @endif
                                 </div>
                             @empty
                                 <div class="flex flex-col items-center justify-center h-full pt-8 pb-4 opacity-50">
@@ -91,6 +92,7 @@
                         </div>
                     </div>
                 @endforeach
+            </div>
             </div>
         </div>
     </div>

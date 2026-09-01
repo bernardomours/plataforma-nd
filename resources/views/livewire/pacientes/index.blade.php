@@ -51,9 +51,11 @@
                         placeholder="Pesquisar pacientes..." 
                         class="block w-full sm:w-64 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
-                    <a href="{{ route('pacientes.create') }}" class="whitespace-nowrap bg-blue-600 text-white px-4 py-2 rounded-md font-semibold text-sm hover:bg-blue-700 transition-colors">
-                        Cadastrar Paciente
-                    </a>
+                    @hasanyrole('admin|manager|administrative')
+                        <a href="{{ route('pacientes.create') }}" class="whitespace-nowrap bg-blue-600 text-white px-4 py-2 rounded-md font-semibold text-sm hover:bg-blue-700 transition-colors">
+                            Cadastrar Paciente
+                        </a>
+                    @endhasanyrole
                 </div>
             </div>
 

@@ -15,6 +15,8 @@
         $coresPasta = [
             'docs_pessoais' => ['bg' => 'bg-amber-50', 'border' => 'border-amber-200', 'icon' => 'text-amber-500', 'badge' => 'bg-amber-100 text-amber-700'],
             'laudos'        => ['bg' => 'bg-blue-50', 'border' => 'border-blue-200', 'icon' => 'text-blue-500', 'badge' => 'bg-blue-100 text-blue-700'],
+            'anamnese'      => ['bg' => 'bg-purple-50', 'border' => 'border-purple-200', 'icon' => 'text-purple-500', 'badge' => 'bg-purple-100 text-purple-700'],
+            'relatorios'    => ['bg' => 'bg-emerald-50', 'border' => 'border-emerald-200', 'icon' => 'text-emerald-500', 'badge' => 'bg-emerald-100 text-emerald-700'],
             'outros'        => ['bg' => 'bg-gray-50', 'border' => 'border-gray-200', 'icon' => 'text-gray-400', 'badge' => 'bg-gray-200 text-gray-700'],
         ];
     @endphp
@@ -40,7 +42,7 @@
 
         @if(! $pastaAtual)
             {{-- Grade de pastas --}}
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 @foreach($pastas as $chave => $pasta)
                     @php $cor = $coresPasta[$chave]; @endphp
                     <button wire:click="abrirPasta('{{ $chave }}')"

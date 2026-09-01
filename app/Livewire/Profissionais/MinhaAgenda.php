@@ -31,9 +31,12 @@ class MinhaAgenda extends Component
             $hojeNome = $dias[$diaSemanaNumero];
             $hojeNomeSemAcento = str_replace('ç', 'c', $hojeNome); // Prevenção para "terca" ou "terça"
 
-            // Busca os horários de hoje deste profissional específico
+            // Busca os horários de hoje deste profissional específico. Bloqueio de
+            // horário ("Notificar Indisponível") não tem paciente nem terapia — sem o
+            // filtro, aparecia na lista como "Paciente Indefinido/Removido".
             $agendamentos = Schedule::with(['patient', 'therapy', 'serviceType'])
                 ->where('professional_id', $profissional->id)
+                ->where('is_blocked', false)
                 ->where(function($query) use ($hojeNome, $hojeNomeSemAcento) {
                     $query->where('day_of_week', 'LIKE', $hojeNome)
                           ->orWhere('day_of_week', 'LIKE', $hojeNomeSemAcento);

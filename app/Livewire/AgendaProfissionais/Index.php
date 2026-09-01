@@ -15,7 +15,11 @@ use Carbon\Carbon;
 class Index extends Component
 {
     public $professional_id = '';
-    public $isRestricted = false; 
+    public $isRestricted = false;
+    // Profissional restrito que atende alguma terapia além de ABA pode editar a
+    // própria agenda (Agendar Paciente / editar / excluir); ABA puro fica só na
+    // visualização. Sempre true fora do caso restrito (admin/manager/... já editam tudo).
+    public $podeEditarAgendaPaciente = true;
     public $isBlockModalOpen = false;
     public $block_day = '';
     public $block_start_time = '';
@@ -34,13 +38,75 @@ class Index extends Component
     public function mount()
     {
         $user = auth()->user();
-        
-        if (!$user->hasAnyRole(['admin', 'manager', 'administrative', 'coordinator', 'supervisor']) && $user->hasRole('profissional')) {
+
+        $papelOrganizacional = $user->hasAnyRole(['admin', 'manager', 'administrative']);
+
+        // coordinator/supervisor só mantém edição irrestrita (qualquer profissional)
+        // se realmente atender ABA — Spatie coordinator atribuído por outro motivo
+        // (ex.: acesso à Coordenação da própria especialidade) não basta sozinho.
+        $coordenaAba = $user->hasAnyRole(['coordinator', 'supervisor'])
+            && ($user->professional?->atendeAba() ?? false);
+
+        if (! $papelOrganizacional && ! $coordenaAba && $user->hasRole('profissional')) {
             $this->isRestricted = true;
+            $this->podeEditarAgendaPaciente = false;
             if ($user->professional) {
                 $this->professional_id = $user->professional->id;
+                $this->podeEditarAgendaPaciente = $user->professional->atendeTerapiaNaoAba();
             }
         }
+    }
+
+    /**
+     * SEGURANÇA (IDOR): isRestricted/professional_id no mount() só define o valor
+     * INICIAL do formulário — o navegador continua livre pra mandar qualquer
+     * professional_id na ação do Livewire. Sem esta checagem, um profissional comum
+     * conseguia criar, editar ou excluir horário/bloqueio na agenda de QUALQUER outro
+     * profissional só trocando esse campo (ou o ID do agendamento) na requisição,
+     * apesar da tela nunca mostrar essa opção pra ele.
+     */
+    private function autorizarProfissionalAlvo(): void
+    {
+        $user = auth()->user();
+
+        if (! $this->isRestricted) {
+            return;
+        }
+
+        if (! $user->professional || (int) $this->professional_id !== (int) $user->professional->id) {
+            abort(403, 'Você só pode gerenciar a própria agenda.');
+        }
+    }
+
+    /**
+     * Além da posse, agendamento de PACIENTE (não bloqueio de horário) só pode ser
+     * criado/editado/excluído por profissional restrito se ele atender terapia além
+     * de ABA (podeEditarAgendaPaciente) — pedido do usuário: ABA puro só visualiza,
+     * multi-terapia mexe na própria agenda. "Notificar Horário Indisponível" (bloqueio)
+     * continua liberado pra todo restrito, independente de terapia — não mudou.
+     */
+    private function autorizarEdicaoAgendaPaciente(): void
+    {
+        if ($this->isRestricted && ! $this->podeEditarAgendaPaciente) {
+            abort(403, 'Você não tem permissão para editar agendamentos de pacientes.');
+        }
+    }
+
+    /**
+     * SEGURANÇA (IDOR): confere que o Schedule pertence ao profissional que o usuário
+     * tem permissão de gerenciar, antes de editar/excluir por ID.
+     */
+    private function autorizarSchedule(int $scheduleId): Schedule
+    {
+        $schedule = Schedule::findOrFail($scheduleId);
+
+        $user = auth()->user();
+        if ($this->isRestricted
+            && (! $user->professional || (int) $schedule->professional_id !== (int) $user->professional->id)) {
+            abort(403, 'Você só pode gerenciar a própria agenda.');
+        }
+
+        return $schedule;
     }
 
     public function openBlockModal()
@@ -65,6 +131,8 @@ class Index extends Component
 
     public function saveBlock()
     {
+        $this->autorizarProfissionalAlvo();
+
         $rules = [
             'professional_id' => 'required|exists:professionals,id',
             'block_day' => 'required|string',
@@ -111,8 +179,9 @@ class Index extends Component
 
     public function removeBlock($scheduleId)
     {
-        $schedule = Schedule::find($scheduleId);
-        if ($schedule && $schedule->is_blocked) {
+        $schedule = $this->autorizarSchedule($scheduleId);
+
+        if ($schedule->is_blocked) {
             $schedule->delete();
             session()->flash('message', 'Bloqueio removido e horário liberado!');
         }
@@ -124,6 +193,9 @@ class Index extends Component
             session()->flash('error', 'Selecione um profissional primeiro.');
             return;
         }
+
+        $this->autorizarProfissionalAlvo();
+        $this->autorizarEdicaoAgendaPaciente();
 
         $this->resetValidation();
         $this->editingScheduleId = null;
@@ -147,8 +219,14 @@ class Index extends Component
 
     public function editSchedule(Schedule $schedule)
     {
+        $this->autorizarSchedule($schedule->id);
+
+        if (! $schedule->is_blocked) {
+            $this->autorizarEdicaoAgendaPaciente();
+        }
+
         $this->resetValidation();
-        
+
         $this->editingScheduleId = $schedule->id;
         $this->patient_id = $schedule->patient_id;
         $this->schedule_day = $schedule->day_of_week;
@@ -168,15 +246,25 @@ class Index extends Component
 
     public function deleteSchedule($id)
     {
-        $schedule = Schedule::find($id);
-        if ($schedule) {
-            $schedule->delete();
-            session()->flash('message', 'Agendamento excluído com sucesso!');
+        $schedule = $this->autorizarSchedule($id);
+
+        if (! $schedule->is_blocked) {
+            $this->autorizarEdicaoAgendaPaciente();
         }
+
+        $schedule->delete();
+        session()->flash('message', 'Agendamento excluído com sucesso!');
     }
 
     public function saveSchedule()
     {
+        $this->autorizarProfissionalAlvo();
+        $this->autorizarEdicaoAgendaPaciente();
+
+        if ($this->editingScheduleId) {
+            $this->autorizarSchedule($this->editingScheduleId);
+        }
+
         $this->validate([
             'patient_id' => 'required|exists:patients,id',
             'schedule_day' => 'required|string',

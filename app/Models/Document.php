@@ -11,29 +11,32 @@ class Document extends Model
 {
     use SoftDeletes;
 
-    public const CATEGORIA_LAUDO = 'laudo';
-    public const CATEGORIA_RECEITA = 'receita';
-    public const CATEGORIA_EXAME = 'exame';
     public const CATEGORIA_DOCS_PESSOAIS = 'docs_pessoais';
+    public const CATEGORIA_LAUDO = 'laudo';
+    public const CATEGORIA_ANAMNESE = 'anamnese';
+    public const CATEGORIA_RELATORIO = 'relatorio';
     public const CATEGORIA_OUTROS = 'outros';
 
     public const CATEGORIA_OPTIONS = [
-        self::CATEGORIA_LAUDO         => 'Laudo',
-        self::CATEGORIA_RECEITA       => 'Receita',
-        self::CATEGORIA_EXAME         => 'Exame',
         self::CATEGORIA_DOCS_PESSOAIS => 'Documentos Pessoais',
+        self::CATEGORIA_LAUDO         => 'Laudo',
+        self::CATEGORIA_ANAMNESE      => 'Anamnese',
+        self::CATEGORIA_RELATORIO     => 'Relatório',
         self::CATEGORIA_OUTROS        => 'Outros',
     ];
 
     /**
-     * Agrupamento visual em "pastas" na tela (Documentos::render()) — não muda a
-     * categoria gravada, só como a listagem organiza o que já existe. "Outros" reúne
-     * tudo que não é laudo nem documento pessoal (inclusive receita e exame).
+     * Agrupamento visual em "pastas" na tela (Documentos::render()) — hoje é 1:1 com
+     * as categorias (cada pasta tem exatamente uma), mas a estrutura continua sendo
+     * "pasta agrupa categorias" de propósito: já foi N:1 antes (Outros reunia
+     * Receita+Exame+Outros) e pode voltar a ser sem mexer no componente/blade.
      */
     public const PASTAS = [
         'docs_pessoais' => ['label' => 'Documentos Pessoais', 'categorias' => [self::CATEGORIA_DOCS_PESSOAIS]],
         'laudos'        => ['label' => 'Laudos', 'categorias' => [self::CATEGORIA_LAUDO]],
-        'outros'        => ['label' => 'Outros', 'categorias' => [self::CATEGORIA_RECEITA, self::CATEGORIA_EXAME, self::CATEGORIA_OUTROS]],
+        'anamnese'      => ['label' => 'Anamnese', 'categorias' => [self::CATEGORIA_ANAMNESE]],
+        'relatorios'    => ['label' => 'Relatórios', 'categorias' => [self::CATEGORIA_RELATORIO]],
+        'outros'        => ['label' => 'Outros', 'categorias' => [self::CATEGORIA_OUTROS]],
     ];
 
     protected $fillable = [

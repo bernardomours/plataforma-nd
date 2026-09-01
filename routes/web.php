@@ -49,7 +49,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // PACIENTES
     Route::get('/pacientes', PacientesIndex::class)->name('pacientes.index');
-    Route::get('/pacientes/cadastrar', PacientesCreate::class)->name('pacientes.create');
+
+    // Precisa vir ANTES de /pacientes/{patient} — senão o Laravel casa "cadastrar"
+    // como se fosse o {patient} do curinga abaixo.
+    Route::middleware('role:admin|manager|administrative')->group(function () {
+        Route::get('/pacientes/cadastrar', PacientesCreate::class)->name('pacientes.create');
+    });
+
     Route::get('/pacientes/{patient}', PacientesShow::class)->name('pacientes.show');
 
     // Laudos e Documentos: rota dedicada (não ação do Livewire), pra abrir de verdade

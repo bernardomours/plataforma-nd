@@ -23,6 +23,12 @@ class Create extends Component
 
     public function mount()
     {
+        // SEGURANÇA: cadastro de paciente não tinha checagem de papel nenhuma — mesmo
+        // grupo já usado em Pacientes\Edit e Pacientes\CargaHoraria.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para cadastrar pacientes.');
+        }
+
         $this->addService();
     }
 
@@ -84,6 +90,10 @@ class Create extends Component
 
     private function performSave()
     {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para cadastrar pacientes.');
+        }
+
         $this->validate();
 
         $patient = Patient::create([

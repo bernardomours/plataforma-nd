@@ -83,6 +83,28 @@ class Professional extends Model
         return $this->morphMany(MovementHistory::class, 'moveable');
     }
 
+    /**
+     * "Multi-terapia": atende alguma terapia além de ABA (mesmo que também atenda ABA).
+     * Governa se o profissional edita a própria agenda em AgendaProfissionais e em
+     * Pacientes\Agenda — quem só faz ABA fica restrito à visualização.
+     */
+    public function atendeTerapiaNaoAba(): bool
+    {
+        return $this->therapies()->where('name', '!=', 'ABA')->exists();
+    }
+
+    /**
+     * Governa se um coordinator/supervisor mantém edição irrestrita (qualquer
+     * profissional) em AgendaProfissionais/Pacientes\Agenda, ou cai na mesma regra
+     * de "só a própria agenda" de quem não atende ABA — ver atendeTerapiaNaoAba().
+     * Papel Spatie coordinator atribuído por outro motivo (ex.: acesso à Coordenação
+     * da própria especialidade) não deve, sozinho, liberar agenda de terceiros.
+     */
+    public function atendeAba(): bool
+    {
+        return $this->therapies()->where('name', 'ABA')->exists();
+    }
+
 
     /**
      * Campos do cadastro do profissional que entram na auditoria.

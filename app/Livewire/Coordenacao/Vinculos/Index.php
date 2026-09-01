@@ -16,6 +16,16 @@ class Index extends Component
     public $profissional_id = '';
     public $search = '';
 
+    public function mount()
+    {
+        // SEGURANÇA: tela inteira era acessível a qualquer papel autenticado — sem
+        // checagem nenhuma. Grupo mais estreito que Cronograma/Acompanhamentos
+        // (sem coordinator/supervisor) pra bater com o link já escondido no menu.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para acessar Vínculos.');
+        }
+    }
+
     // Reseta a paginação sempre que o profissional ou a pesquisa mudar
     public function updatedProfissionalId()
     {

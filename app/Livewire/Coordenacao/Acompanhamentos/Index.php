@@ -44,6 +44,12 @@ class Index extends Component
 
     public function mount()
     {
+        // SEGURANÇA: página inteira era acessível a qualquer papel autenticado
+        // (inclusive profissional), e deleteSelected()/salvarVisit() não tinham
+        // checagem nenhuma — qualquer um conseguia excluir/editar visita de
+        // coordenação/supervisão em massa.
+        $this->autorizarAcesso();
+
         for ($i = 0; $i <= 5; $i++) {
             $ano = now()->subYears($i)->year;
             $this->anosDisponiveis[$ano] = $ano;
@@ -64,6 +70,13 @@ class Index extends Component
             if ($profissional) {
                 $this->profissional_id = $profissional->id;
             }
+        }
+    }
+
+    private function autorizarAcesso(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative', 'coordinator', 'supervisor'])) {
+            abort(403, 'Você não tem permissão para acessar Acompanhamentos.');
         }
     }
 
@@ -98,6 +111,8 @@ class Index extends Component
 
     public function deleteSelected()
     {
+        $this->autorizarAcesso();
+
         if (!empty($this->selectedVisits)) {
             Visit::whereIn('id', $this->selectedVisits)->delete();
             $this->selectedVisits = [];
@@ -137,6 +152,8 @@ class Index extends Component
 
     public function salvarVisit()
     {
+        $this->autorizarAcesso();
+
         $rules = [
             'formProfissionalId' => 'nullable|exists:professionals,id',
             'formTipo' => 'required',

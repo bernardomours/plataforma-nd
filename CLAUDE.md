@@ -154,14 +154,17 @@ componente sequer montar — diferente de `NeuroAssessment`, que não tem `unit_
 checagem manual (`authorizeAssessmentAccess()`).
 
 Tipo de arquivo permitido: PDF, JPG, PNG. Tamanho máximo: 10MB. Categorias fechadas por
-enquanto: Laudo, Receita, Exame, Documentos Pessoais, Outros (`Document::CATEGORIA_OPTIONS`).
+enquanto: Documentos Pessoais, Laudo, Anamnese, Relatório, Outros (`Document::CATEGORIA_OPTIONS`).
+Trocaram de Laudo/Receita/Exame/Docs Pessoais/Outros em 31/08/2026, um dia antes de nenhum
+documento real ter sido carregado em produção — sem necessidade de migração de dado.
 
-**A tela agrupa em 3 "pastas" visuais** (`Document::PASTAS`), que **não** são 1:1 com as
-categorias — é só como a listagem organiza o que já existe, a categoria gravada continua a
-mesma: Laudos = categoria Laudo; Docs Pessoais = categoria Documentos Pessoais; Outros = Receita
-+ Exame + Outros somadas. Abrir o modal de dentro de uma pasta com categoria única já
-pré-seleciona ela; de dentro de "Outros" (3 categorias) fica em branco, porque não dá pra
-adivinhar qual das três.
+**A tela agrupa em pastas visuais** (`Document::PASTAS`) — hoje 1:1 com as categorias (5 pastas,
+5 categorias), mas a estrutura continua sendo "pasta agrupa uma lista de categorias" de
+propósito: já foi N:1 antes (Outros reunia Receita+Exame+Outros) e pode voltar a ser sem mexer
+no componente nem no blade, só no array `PASTAS`. Abrir o modal de dentro de uma pasta com
+categoria única já pré-seleciona ela — hoje isso vale pras 5, porque nenhuma pasta agrupa mais
+de uma categoria; se voltar a agrupar, a pasta com mais de uma fica em branco de novo (não dá
+pra adivinhar qual).
 
 Exclusão é soft delete (mesmo padrão do resto do sistema) — o arquivo físico **não** é apagado
 do disco quando o registro é excluído, só fica invisível na tela. Decisão consciente: mantém a
@@ -731,6 +734,77 @@ nunca `null`. A validação `nullable|date` deixa `''` passar sem erro (é exata
 tratada, ou seja, erro 500 na hora de salvar, não uma mensagem de validação normal. Aconteceu
 em produção ao tentar limpar as 5 contas acima pela tela. Corrigido em `Usuarios\Create::save()`
 e `Usuarios\Edit::update()` com `$this->birth_date ?: null` antes do `create()`/`update()`.
+
+---
+
+## Auditoria de acesso do papel `profissional` (28/08/2026)
+
+Levantamento feito antes da apresentação da plataforma pros profissionais — toda rota
+alcançável sem `role:` na definição (ou seja, aberta a qualquer papel autenticado, inclusive
+`profissional`) foi conferida por dentro do componente. Achados reais, todos corrigidos:
+
+| Componente | Problema | Correção |
+|---|---|---|
+| `AgendaProfissionais\Index` | **Crítico.** `isRestricted`/`professional_id` no `mount()` só define o valor inicial do formulário — `saveBlock`, `removeBlock`, `deleteSchedule`, `saveSchedule` aceitavam qualquer `professional_id`/ID de agendamento vindo da requisição. Um profissional conseguia criar, editar ou excluir horário/bloqueio na agenda de **qualquer colega**. | `autorizarProfissionalAlvo()` e `autorizarSchedule()` conferem, quando `isRestricted`, que o alvo é a própria ficha de `Professional` — chamados em toda ação de escrita. |
+| `Coordenacao\Acompanhamentos\Index` | Tela inteira sem checagem; `deleteSelected()` (exclusão em massa de `Visit`) e `salvarVisit()` sem checagem nenhuma. | `mount()` + as duas ações exigem `admin\|manager\|administrative\|coordinator\|supervisor`. |
+| `Coordenacao\Cronograma\Index` | Tela inteira sem checagem — status de coordenação/supervisão de todos os pacientes. | Mesmo grupo do Acompanhamentos. |
+| `Coordenacao\Vinculos\Index` | Tela inteira sem checagem. | `admin\|manager\|administrative` (mais estreito, sem coordinator/supervisor — pra bater com o link já escondido no menu). |
+| `Pacientes\Create` | Cadastro de paciente sem checagem de papel (isolamento por unidade já existia, papel não). | `admin\|manager\|administrative`, mesmo grupo de `Pacientes\Edit`/`CargaHoraria`. Rota também movida pra dentro do grupo `role:`, cuidando pra continuar registrada **antes** de `/pacientes/{patient}` (senão o Laravel casa "cadastrar" como ID). |
+| `Qualidade\Create` | `Qualidade\Edit` já exigia admin\|manager; `Create` não tinha nada. | Mesmo guard do Edit. |
+| `Qualidade\Index::toggleChecklist()` | IDOR — marcava/desmarcava checklist de processo ao qual o usuário não está vinculado, só sabendo o ID. | Confere vínculo com o processo (ou admin/manager) antes de alterar. |
+| `Pacientes\Agenda` | **Crítico, mesma classe do AgendaProfissionais.** `openModal`, `editSchedule`, `saveSchedule`, `deleteSchedule` sem checagem nenhuma — `deleteSchedule($id)` nem verificava se o horário pertencia ao paciente da página. Qualquer profissional excluía/editava agenda de **qualquer paciente**, direto por ID. | `autorizarEscrita()` (`admin\|manager\|administrative\|coordinator\|supervisor`, mesmo grupo do `@hasanyrole` que já escondia os botões) + confere `patient_id` do horário contra `$this->patient` antes de editar/excluir. |
+
+Todos, exceto o último, já tinham o link do menu corretamente escondido — a falha era só no
+componente por trás, alcançável direto por URL. Mesmo padrão de toda a sessão: esconder botão
+não basta, quem segura a porta é o método.
+
+**Achado à parte, na mesma varredura**: a aba Agenda da ficha do paciente usava
+`grid grid-cols-5` pros dias da semana **sem** `overflow-x-auto`/`min-w` — diferente da Agenda
+de Profissionais, que já tinha essa proteção. No celular, os 5 dias espremeriam numa faixa
+ilegível em vez de rolar horizontalmente. Corrigido com o mesmo padrão.
+
+---
+
+## Edição de agenda por profissional multi-terapia (31/08/2026)
+
+`AgendaProfissionais\Index` e `Pacientes\Agenda` (aba Agenda do paciente) eram, até aqui,
+visualização pura pra qualquer `profissional` sem outro papel: só `admin|manager|administrative|
+coordinator|supervisor` editava. Pedido do usuário: profissional que atende alguma terapia
+**além de ABA** (mesmo atendendo ABA também) deve poder editar a **própria** agenda nas duas
+telas; quem só atende ABA continua só visualizando (e "Notificar Horário Indisponível" continua
+liberado pra todo mundo, independente de terapia — isso não mudou).
+
+`Professional::atendeTerapiaNaoAba()` / `atendeAba()` leem a pivô `professional_therapy`
+(`therapies()`) — nenhuma tabela nova.
+
+**O papel Spatie `coordinator` sozinho não basta mais pra edição irrestrita.** Levantamento em
+28/08/2026 achou 17 usuários com `profissional` + papel elevado (quase sempre `coordinator`); 13
+eram coordenadores/supervisores reais de ABA, mas 4 (Ana Beatriz Santos, Karina Karla Lourenço do
+Nascimento, Maria Nazaré da Silva Izidio do Nascimento, Willian da Silva Nunes) não atendem ABA e
+tinham o papel só, ao que tudo indica, pra acessar as telas de Coordenação da própria
+especialidade — o que **destravava sem querer** edição irrestrita da agenda de qualquer
+profissional nessas duas telas. Confirmado com o usuário: `coordinator`/`supervisor` só mantém
+edição irrestrita (qualquer profissional/paciente) se o `Professional` vinculado realmente
+atender ABA (`atendeAba()`); sem isso, cai na mesma regra de "só a própria agenda" de um
+profissional comum. Não afeta o acesso às telas de Coordenação em si (isso é outra checagem,
+inalterada) — só tira a edição de agenda alheia que vinha de carona.
+
+Em `AgendaProfissionais\Index`: `$podeEditarAgendaPaciente` (sempre `true` fora do caso
+restrito) governa "Agendar Paciente", a zona de clique pra novo agendamento e os botões
+editar/excluir do cartão do paciente — calculado em `mount()` via `atendeTerapiaNaoAba()`, e
+revalidado no servidor por `autorizarEdicaoAgendaPaciente()` em `openScheduleModal`/
+`saveSchedule`/`editSchedule`/`deleteSchedule` (só quando o `Schedule` não é bloqueio — excluir/
+editar um **bloqueio** de horário continua liberado pra todo restrito, sem essa checagem extra).
+
+Em `Pacientes\Agenda`: `$podeGerenciarAgenda` (irrestrito, ou multi-terapia) e
+`$isRestrictedProfissional` (trava o alvo ao próprio `professional_id`) substituem o antigo
+`@hasanyrole` fixo do blade. `podeEditarSchedule($schedule)` decide, por linha, se mostra
+editar/excluir — irrestrito vê tudo, multi-terapia só o que já é dele. `autorizarProfissionalAlvo()`
+(no `saveSchedule`, contra o `professional_id` submetido) e `autorizarScheduleAlvo()` (em
+`editSchedule`/`deleteSchedule`/no registro que está sendo editado) impedem um multi-terapia de
+atribuir ou "adotar" o horário de um colega por esta tela — inclusive editando um horário que já
+era do colega só pra trocar o `professional_id` pro dele mesmo. O dropdown de profissional em
+`render()` já filtra pra mostrar só ele mesmo quando restrito, então nem chega a listar colega.
 
 ---
 

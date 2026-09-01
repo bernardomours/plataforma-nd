@@ -14,8 +14,22 @@ class Index extends Component
     public function toggleChecklist($checklistId)
     {
         $checklist = QualityChecklist::find($checklistId);
-        
+
         if (!$checklist) return;
+
+        // SEGURANÇA (IDOR): sem isso, qualquer usuário autenticado conseguia marcar/
+        // desmarcar checklist de um processo de qualidade ao qual não está vinculado,
+        // só sabendo o ID — a tela só mostra processo próprio, mas essa ação não
+        // conferia nada.
+        $user = auth()->user();
+        if (! $user->isAdmin() && ! $user->isManager()) {
+            $processo = QualityProcess::find($checklist->quality_process_id);
+            $vinculado = $processo && $processo->users->contains('id', $user->id);
+
+            if (! $vinculado) {
+                abort(403, 'Você não tem permissão para alterar este processo de qualidade.');
+            }
+        }
 
         $checklists = QualityChecklist::where('quality_process_id', $checklist->quality_process_id)
                                       ->orderBy('id')

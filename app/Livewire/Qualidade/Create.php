@@ -23,6 +23,12 @@ class Create extends Component
 
     public function mount()
     {
+        // SEGURANÇA: criar processo de qualidade não tinha checagem nenhuma, apesar de
+        // Qualidade\Edit já exigir admin|manager — mesmo grupo aqui.
+        if (! auth()->user()->isAdmin() && ! auth()->user()->isManager()) {
+            abort(403, 'Você não tem permissão para criar processos de qualidade.');
+        }
+
         $this->checklists = [
             ['description' => 'Em elaboração'],
             ['description' => 'Documento Aprovado'],
@@ -47,6 +53,10 @@ class Create extends Component
 
     public function save()
     {
+        if (! auth()->user()->isAdmin() && ! auth()->user()->isManager()) {
+            abort(403, 'Você não tem permissão para criar processos de qualidade.');
+        }
+
         $this->validate([
             'sector' => 'required|string|max:255',
             'process_name' => 'required|string|max:255',

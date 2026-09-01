@@ -37,6 +37,16 @@ class Index extends Component
         'supervisao' => []
     ];
 
+    public function mount()
+    {
+        // SEGURANÇA: tela inteira era acessível a qualquer papel autenticado — sem
+        // checagem nenhuma. Mostra status de coordenação/supervisão por paciente,
+        // não é dado que um profissional comum deveria ver de todo mundo.
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative', 'coordinator', 'supervisor'])) {
+            abort(403, 'Você não tem permissão para acessar o Cronograma.');
+        }
+    }
+
     public function updatedSearch() { $this->resetPage(); }
     public function aplicarFiltros() { $this->resetPage(); }
     public function limparFiltros()
