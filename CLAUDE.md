@@ -140,13 +140,18 @@ unidade — mesmo padrão de `AvaliacoesNeuro\Edit::authorizeAssessmentAccess()`
 com `withoutGlobalScopes()` de propósito pra poder negar mesmo quando o scope esconderia o
 registro.
 
-**Laudos e Documentos é `admin|manager|administrative`**, mais restrito que o resto da ficha do
-paciente (`/pacientes/{patient}` é aberta a qualquer papel autenticado de propósito — ver
-"Autorização"). Justificativa: laudo é dado de saúde mais sensível que agenda/CH. Checado tanto
-no `@hasanyrole` da aba (`Pacientes\Show`) quanto de novo no `mount()` de `Pacientes\Documentos`
-— mesmo motivo de sempre, ação do Livewire não passa pelo middleware da rota, e nem pelo
-`@hasanyrole` do componente pai (que só esconde o botão da aba, não impede montar o componente
-via URL direta com `?aba=laudos`).
+**Laudos e Documentos é `admin|manager|administrative` + profissional multi-terapia**, mais
+restrito que o resto da ficha do paciente (`/pacientes/{patient}` é aberta a qualquer papel
+autenticado de propósito — ver "Autorização"). Justificativa original: laudo é dado de saúde
+mais sensível que agenda/CH. Em 01/09/2026 liberado também pra quem atende terapia além de ABA
+(mesma regra e mesmo motivo de "Edição de agenda por profissional multi-terapia" — quem só faz
+ABA continua sem acesso) — `User::podeAcessarLaudosDocumentos()` centraliza a regra
+(`hasAnyRole(['admin','manager','administrative']) || atendeTerapiaNaoAba()`) pra não duplicar a
+condição nos três lugares que precisam dela: o `@if` da aba em `Pacientes\Show`, o `mount()` (e
+toda ação de escrita) de `Pacientes\Documentos`, e `DocumentController::autorizar()` — esse
+último é o que mais importa, porque é o que segura a porta de verdade (a aba escondida e o
+`mount()` do componente não protegem a rota de visualizar/baixar, que recebe o ID do documento
+direto na URL).
 
 Isolamento por unidade **não precisou de código extra**: `Patient` já tem o global scope de
 `IsolatesByUnit`, então o route model binding do `{patient}` já filtra por unidade antes do
@@ -665,6 +670,40 @@ antes de apagar, com snapshot dos dados.
 
 A tela `Controles\Index` resolve a unidade de cada registro por caminhos diferentes conforme o
 tipo (paciente por `unit_id`, profissional pela pivô, movimentação pelo `moveable`).
+
+Este pacote (`spatie/laravel-activitylog` 5.0.0) grava o diff em **`attribute_changes`**, não em
+`properties` — `$activity->properties` vem sempre vazio nos testes locais. O blade de Controles já
+tinha esse contorno pronto antes de existir aqui (comentário "busca da nova coluna
+`attribute_changes` se properties estiver vazia"); qualquer código novo que leia log de atividade
+tem que ler dali, não de `properties` direto, senão parece que não gravou nada.
+
+**Controle de atividades da Agenda (31/08/2026).** Motivado por profissional multi-terapia
+poder editar a própria agenda em `Pacientes\Agenda` (ver "Edição de agenda por profissional
+multi-terapia") — a coordenação pediu rastreio de **tudo** que muda num horário: dia, horário,
+profissional, paciente, terapia, ambiente, e quem excluiu. `Schedule` ganhou `LogsActivity`,
+diferente de `Patient`/`Professional`: aqui `deleted` **entra** na lista de eventos (`$recordEvents
+= ['created', 'updated', 'deleted']`), porque excluir um horário é exatamente o tipo de mudança que
+supervisão precisa enxergar. `Schedule` não tem soft delete, então `delete()` é exclusão de
+verdade e, ao contrário do `forceDelete()` de `Patient`, dispara o evento normalmente — sem
+precisar de log manual.
+
+Aba própria em `Controles\Index` (`setTab('agenda')`), separada de "Entradas e Saídas" de
+propósito: criação/exclusão de `Schedule` foi **excluída** do filtro de "Entradas e Saídas"
+(`where('subject_type', '!=', Schedule::class)`) pra não misturar com desligamento/retorno de
+paciente e profissional, que tem badge e motivo/observação própria vindos de `MovementHistory`.
+
+O log grava só o **ID** dos campos de relação (`professional_id`, `therapy_id`,
+`service_type_id`, `patient_id`) — pra supervisão isso é inútil sem o nome.
+`Controles\Index::formatarValorAgenda()`/`labelCampoAgenda()` resolvem ID -> nome (com
+`withTrashed()` pro paciente, já que a tela de Agenda aceita paciente com saída registrada) e dão
+rótulo em português a cada campo; usados tanto no diff de `updated` quanto no snapshot completo de
+`created`/`deleted`.
+
+**Filtro por unidade e horário excluído não se misturam bem.** Sem soft delete, um `Schedule`
+excluído já não existe na tabela pra resolver a unidade pelo paciente vinculado. Em vez de esconder
+esse registro do filtro por unidade (pior, numa tela de supervisão, que esconder de menos), a
+exclusão de agenda aparece **independente do filtro de unidade** quando o filtro está ativo — dá
+pra ver, só não dá pra saber de qual unidade só olhando a lista filtrada.
 
 ---
 

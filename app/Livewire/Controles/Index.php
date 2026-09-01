@@ -10,6 +10,9 @@ use Spatie\Activitylog\Models\Activity;
 use App\Models\MovementHistory;
 use App\Models\Patient;
 use App\Models\Professional;
+use App\Models\Schedule;
+use App\Models\Therapy;
+use App\Models\ServiceType;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -57,6 +60,18 @@ class Index extends Component
             ->select('id');
     }
 
+    /**
+     * Schedule não guarda o próprio patient_id em properties de forma direta pra unidade
+     * (isso é resolvido pelo paciente vinculado), então busca todo Schedule cujo
+     * patient_id caiu na unidade filtrada — inclusive de paciente já com saída.
+     */
+    private function agendasDaUnidade(int $unitId)
+    {
+        return Schedule::query()
+            ->whereIn('patient_id', $this->pacientesDaUnidade($unitId))
+            ->select('id');
+    }
+
     public function unidadeDoRegistro(Activity $atividade): string
     {
         $subject = $atividade->subject;
@@ -75,15 +90,71 @@ class Index extends Component
             return $nomes->isEmpty() ? '—' : $nomes->implode(', ');
         }
 
-        // Fallback: registro já excluído do banco — usa o snapshot da própria atividade.
+        if ($subject instanceof Schedule) {
+            return $subject->patient?->unit?->city ?? '—';
+        }
+
+        // Fallback: registro já excluído do banco (Schedule inclusive, já que não tem
+        // soft delete) — usa o patient_id gravado no snapshot da própria atividade.
         $unitId = data_get($atividade->properties, 'attributes.unit_id')
             ?? data_get($atividade->attribute_changes, 'attributes.unit_id');
+
+        if (! $unitId && $atividade->subject_type === Schedule::class) {
+            $patientId = data_get($atividade->properties, 'attributes.patient_id')
+                ?? data_get($atividade->properties, 'old.patient_id')
+                ?? data_get($atividade->attribute_changes, 'attributes.patient_id')
+                ?? data_get($atividade->attribute_changes, 'old.patient_id');
+
+            if ($patientId) {
+                return Patient::withoutGlobalScopes()->withTrashed()->find($patientId)?->unit?->city ?? '—';
+            }
+        }
 
         if ($unitId) {
             return Unit::find($unitId)?->city ?? '—';
         }
 
         return '—';
+    }
+
+    /**
+     * Resolve o rótulo pra exibir um campo da agenda ("Início" em vez de "start_time").
+     */
+    public function labelCampoAgenda(string $campo): string
+    {
+        return match ($campo) {
+            'day_of_week'      => 'Dia da semana',
+            'start_time'       => 'Início',
+            'end_time'         => 'Término',
+            'patient_id'       => 'Paciente',
+            'professional_id'  => 'Profissional',
+            'therapy_id'       => 'Terapia',
+            'service_type_id'  => 'Ambiente',
+            'is_blocked'       => 'Natureza',
+            default            => $campo,
+        };
+    }
+
+    /**
+     * Resolve o VALOR de um campo da agenda pra algo legível — os campos de relação
+     * gravam só o ID no log, e supervisão precisa do nome, não do número.
+     */
+    public function formatarValorAgenda(string $campo, $valor): string
+    {
+        if ($valor === null || $valor === '') {
+            return '—';
+        }
+
+        return match ($campo) {
+            'day_of_week'     => ucfirst((string) $valor),
+            'start_time', 'end_time' => \Illuminate\Support\Str::of((string) $valor)->substr(0, 5)->toString(),
+            'patient_id'      => Patient::withoutGlobalScopes()->withTrashed()->find($valor)?->name ?? "Paciente #{$valor}",
+            'professional_id' => Professional::withTrashed()->find($valor)?->name ?? "Profissional #{$valor}",
+            'therapy_id'      => Therapy::find($valor)?->name ?? "Terapia #{$valor}",
+            'service_type_id' => ServiceType::find($valor)?->name ?? "Tipo #{$valor}",
+            'is_blocked'      => $valor ? 'Bloqueio de horário' : 'Atendimento de paciente',
+            default           => (string) $valor,
+        };
     }
 
     private function resolverMoveable(MovementHistory $movimento)
@@ -114,6 +185,7 @@ class Index extends Component
                     MovementHistory::class => ['moveable'],
                     Patient::class         => ['unit'],
                     Professional::class    => ['units'],
+                    Schedule::class        => ['patient.unit'],
                 ]);
             },
         ])->latest();
@@ -121,10 +193,17 @@ class Index extends Component
         if ($this->tab === 'atualizacoes') {
             $query->where('event', 'updated');
         } elseif ($this->tab === 'entradas_saidas') {
+            // Schedule fica de fora daqui de propósito — criação/exclusão de horário tem
+            // aba própria ('agenda'), pra não misturar com entrada/saída de paciente e
+            // profissional (badges e motivo/observação são específicos de MovementHistory).
             $query->where(function ($q) {
-                $q->whereIn('event', ['created', 'deleted', 'restored'])
-                  ->orWhere('subject_type', MovementHistory::class);
+                $q->where(function ($q2) {
+                    $q2->whereIn('event', ['created', 'deleted', 'restored'])
+                       ->where('subject_type', '!=', Schedule::class);
+                })->orWhere('subject_type', MovementHistory::class);
             });
+        } elseif ($this->tab === 'agenda') {
+            $query->where('subject_type', Schedule::class);
         }
 
         if (! empty($this->unit_id)) {
@@ -151,6 +230,17 @@ class Index extends Component
                                 ->whereIn('moveable_id', $this->profissionaisDaUnidade($unitId));
                           })
                           ->select('id'));
+                })
+                ->orWhere(function ($s) use ($unitId) {
+                    // Schedule não tem soft delete: horário excluído já não existe na
+                    // tabela pra resolver a unidade pelo paciente. Em vez de esconder o
+                    // registro do filtro (pior que mostrar de mais numa tela de
+                    // supervisão), exclusão de agenda aparece independente da unidade.
+                    $s->where('subject_type', Schedule::class)
+                      ->where(function ($s2) use ($unitId) {
+                          $s2->whereIn('subject_id', $this->agendasDaUnidade($unitId))
+                             ->orWhere('event', 'deleted');
+                      });
                 });
             });
         }

@@ -83,7 +83,7 @@
                                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                                     INDISPONÍVEL
                                                 </div>
-                                                <button wire:click="removeBlock({{ $horario->id }})" wire:confirm="Liberar este dia inteiro?" class="p-1 bg-white rounded text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shadow-sm" title="Liberar horário">
+                                                <button wire:click="removeBlock({{ $horario->id }})" wire:confirm="Liberar este dia inteiro?" class="p-1 bg-white rounded text-red-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-50 shadow-sm" title="Liberar horário">
                                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                                 </button>
                                             </div>
@@ -117,7 +117,7 @@
                                             @if(empty($dias[$numeroDia]) && !$diaTodoBloqueado && $podeEditarAgendaPaciente)
                                                 <div wire:click="openScheduleModal({{ $numeroDia }}, '{{ $hora }}')" 
                                                      class="absolute inset-0 cursor-pointer hover:bg-blue-50/20 transition-all flex items-center justify-center group/empty z-0">
-                                                    <span class="text-[11px] font-bold text-blue-500 bg-blue-100/80 px-2 py-1 rounded-md opacity-0 group-hover/empty:opacity-100 transition-all flex items-center gap-1 shadow-sm">
+                                                    <span class="text-[11px] font-bold text-blue-500 bg-blue-100/80 px-2 py-1 rounded-md opacity-60 md:opacity-0 md:group-hover/empty:opacity-100 transition-all flex items-center gap-1 shadow-sm">
                                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                                                         Agendar
                                                     </span>
@@ -143,7 +143,7 @@
                                                             <svg class="w-3 h-3 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                                             Indisponível
                                                         </div>
-                                                        <button wire:click="removeBlock({{ $horario->id }})" wire:confirm="Deseja liberar este horário?" class="absolute top-1 right-1 p-0.5 bg-white border border-red-200 rounded text-red-500 opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-red-50 shadow-sm">
+                                                        <button wire:click="removeBlock({{ $horario->id }})" wire:confirm="Deseja liberar este horário?" class="absolute top-1 right-1 p-0.5 bg-white border border-red-200 rounded text-red-500 opacity-100 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity hover:bg-red-50 shadow-sm">
                                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                                         </button>
                                                     </div>
@@ -163,7 +163,7 @@
                                                         <div class="text-[9px] text-gray-500 mt-1 truncate pr-12">{{ $horario->serviceType?->name ?? 'Clínica' }}</div>
                                                         
                                                         @if($podeEditarAgendaPaciente)
-                                                            <div class="absolute top-1 right-1 flex flex-row gap-1 opacity-0 group-hover/patient:opacity-100 transition-opacity">
+                                                            <div class="absolute top-1 right-1 flex flex-row gap-1 opacity-100 md:opacity-0 md:group-hover/patient:opacity-100 transition-opacity">
                                                                 <button wire:click="editSchedule({{ $horario->id }})" class="p-1 bg-white border border-blue-200 rounded text-blue-600 hover:bg-blue-50 shadow-sm" title="Editar Horário">
                                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                                                 </button>

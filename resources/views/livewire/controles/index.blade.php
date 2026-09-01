@@ -21,6 +21,10 @@
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     Entradas e Saídas
                 </button>
+                <button wire:click="setTab('agenda')" class="flex items-center px-4 py-2 text-sm font-semibold rounded-lg transition-colors {{ $tab === 'agenda' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50' }}">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Agenda
+                </button>
             </div>
         </div>
 
@@ -98,8 +102,11 @@
                                     'Professional' => 'Profissional',
                                     'User' => 'Usuário',
                                     'MovementHistory' => 'Desligamento/Entrada',
+                                    'Schedule' => 'Agenda',
                                     default => $modeloOriginal
                                 };
+
+                                $isSchedule = $modeloOriginal === 'Schedule';
 
                                 // =======================================================
                                 // O SEGREDO: BUSCAR O NOME INCLUSIVE NA LIXEIRA (TRASHED)
@@ -148,6 +155,23 @@
                                     } else {
                                         $subjectName = 'Registro Excluído Definitivamente';
                                     }
+                                } elseif ($isSchedule) {
+                                    // Prioriza a relação viva do Schedule: logOnlyDirty() só grava os
+                                    // campos que MUDARAM, então uma edição de horário/profissional (sem
+                                    // mexer no paciente) nem grava patient_id no log — cair direto pro
+                                    // snapshot fazia parecer que o paciente tinha sumido, sem ter sumido.
+                                    // Só quando o horário já foi excluído (Schedule sem soft delete, subject
+                                    // não existe mais) é que sobra o snapshot como única fonte.
+                                    $pacienteSchedule = $atividade->subject?->patient;
+
+                                    if (! $pacienteSchedule) {
+                                        $pacienteIdSchedule = $atributos['patient_id'] ?? ($props['old']['patient_id'] ?? null);
+                                        $pacienteSchedule = $pacienteIdSchedule
+                                            ? \App\Models\Patient::withoutGlobalScopes()->withTrashed()->find($pacienteIdSchedule)
+                                            : null;
+                                    }
+
+                                    $subjectName = $pacienteSchedule?->name ?? 'Paciente removido';
                                 } else {
                                     $subjectName = $atividade->subject?->name ?? 'Registro #' . $atividade->subject_id;
                                 }
@@ -159,7 +183,7 @@
                                 if ($isMovement) {
                                     $acaoClinica = $atributos['action'] ?? '';
                                     $acaoLower = mb_strtolower($acaoClinica);
-                                    
+
                                     if ($acaoLower === 'saida' || $acaoLower === 'saída') {
                                         $badgeAcao = 'SAÍDA';
                                         $badgeColor = 'text-red-600 bg-red-50 border-red-200';
@@ -170,6 +194,21 @@
                                         $badgeAcao = 'MOVIMENTAÇÃO';
                                         $badgeColor = 'text-blue-600 bg-blue-50 border-blue-200';
                                     }
+                                } elseif ($isSchedule) {
+                                    // "ENTRADA/SAÍDA" confundiria com movimentação de paciente/profissional
+                                    // nesta linha — rótulo próprio pra deixar claro que é a agenda.
+                                    $badgeAcao = match($atividade->event) {
+                                        'created' => 'NOVO HORÁRIO',
+                                        'updated' => 'HORÁRIO ALTERADO',
+                                        'deleted' => 'HORÁRIO REMOVIDO',
+                                        default   => mb_strtoupper($atividade->event)
+                                    };
+
+                                    $badgeColor = match($atividade->event) {
+                                        'created' => 'text-green-600 bg-green-50 border-green-200',
+                                        'deleted' => 'text-red-600 bg-red-50 border-red-200',
+                                        default   => 'text-orange-600 bg-orange-50 border-orange-200',
+                                    };
                                 } else {
                                     $badgeAcao = match($atividade->event) {
                                         'created' => 'ENTRADA',
@@ -216,7 +255,42 @@
                                 </td>
 
                                 <td class="py-4 px-6 text-gray-700 max-w-sm whitespace-normal text-sm">
-                                    @if($isMovement && $atividade->event === 'created')
+                                    @if($isSchedule && $atividade->event === 'created')
+                                        {{-- Novo horário: mostra todos os campos já com nome resolvido, não IDs cru --}}
+                                        <div class="space-y-1 text-xs">
+                                            @foreach($atributos as $campo => $valor)
+                                                <div>
+                                                    <span class="font-bold text-gray-900">{{ $this->labelCampoAgenda($campo) }}:</span>
+                                                    <span class="text-gray-700">{{ $this->formatarValorAgenda($campo, $valor) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @elseif($isSchedule && $atividade->event === 'deleted')
+                                        {{-- Horário excluído: Schedule não tem soft delete, então isto É o
+                                             único registro de que aquele horário chegou a existir. --}}
+                                        @php $snapshotRemovido = $props['old'] ?? $atributos; @endphp
+                                        <div class="space-y-1 text-xs">
+                                            <div class="text-red-600 font-semibold mb-1">Horário removido da agenda:</div>
+                                            @foreach($snapshotRemovido as $campo => $valor)
+                                                <div>
+                                                    <span class="font-bold text-gray-900">{{ $this->labelCampoAgenda($campo) }}:</span>
+                                                    <span class="text-gray-700">{{ $this->formatarValorAgenda($campo, $valor) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @elseif($isSchedule && $atividade->event === 'updated')
+                                        <div class="space-y-1.5 text-xs">
+                                            @foreach($atributos as $campo => $novoValor)
+                                                @php $valorAntigo = $props['old'][$campo] ?? null; @endphp
+                                                <div class="flex flex-wrap items-center gap-1">
+                                                    <span class="font-bold text-gray-900">{{ $this->labelCampoAgenda($campo) }}:</span>
+                                                    <span class="text-gray-500 line-through">{{ $this->formatarValorAgenda($campo, $valorAntigo) }}</span>
+                                                    <span class="text-gray-800 font-bold">➜</span>
+                                                    <span class="font-semibold text-gray-900">{{ $this->formatarValorAgenda($campo, $novoValor) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @elseif($isMovement && $atividade->event === 'created')
                                         <div class="flex items-center">
                                             <span class="w-2.5 h-2.5 rounded-full {{ $badgeAcao === 'SAÍDA' ? 'bg-red-500' : 'bg-green-500' }} mr-2"></span>
                                             Registro de {{ ucfirst(mb_strtolower($badgeAcao)) }} oficializado.

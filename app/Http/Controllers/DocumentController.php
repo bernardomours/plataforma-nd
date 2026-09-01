@@ -54,7 +54,7 @@ class DocumentController extends Controller
      */
     private function autorizar(Document $document): void
     {
-        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+        if (! auth()->user()->podeAcessarLaudosDocumentos()) {
             abort(403, 'Você não tem permissão para acessar este documento.');
         }
 

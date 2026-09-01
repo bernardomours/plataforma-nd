@@ -11,8 +11,9 @@ use Livewire\WithFileUploads;
 
 /**
  * Laudos e Documentos do paciente. Dado de saúde sensível — restrito a
- * admin|manager|administrative, diferente do resto da ficha do paciente (que é aberta
- * a qualquer papel autenticado de propósito, para o profissional ver a própria agenda).
+ * admin|manager|administrative + profissional multi-terapia (User::podeAcessarLaudosDocumentos()),
+ * diferente do resto da ficha do paciente (que é aberta a qualquer papel autenticado de
+ * propósito, para o profissional ver a própria agenda).
  *
  * Arquivo em si vive no disco 'documents' (config/filesystems.php) — local por padrão,
  * trocável pra S3/R2 via .env sem tocar em código. Visualizar/baixar são rotas dedicadas
@@ -54,7 +55,7 @@ class Documentos extends Component
 
     private function autorizarAcesso(): void
     {
-        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+        if (! auth()->user()->podeAcessarLaudosDocumentos()) {
             abort(403, 'Você não tem permissão para acessar laudos e documentos.');
         }
     }

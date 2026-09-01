@@ -5,10 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class Schedule extends Model
 {
     use HasFactory;
+    use LogsActivity;
+
+    /**
+     * Diferente de Patient/Professional (só created/updated), aqui 'deleted' entra de
+     * propósito: agora que profissional multi-terapia edita a própria agenda em
+     * Pacientes\Agenda, a coordenação precisa saber quando um horário é removido, não só
+     * criado/alterado — ver "Controle de atividades da Agenda" no CLAUDE.md. Schedule não
+     * usa SoftDeletes, então delete() é exclusão de verdade e dispara o evento normalmente
+     * (diferente do forceDelete() de Patient, que não dispara nada).
+     */
+    protected static $recordEvents = ['created', 'updated', 'deleted'];
 
     /**
      * The attributes that are mass assignable.
@@ -25,6 +38,23 @@ class Schedule extends Model
         'service_type_id',
         'is_blocked',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'day_of_week',
+                'start_time',
+                'end_time',
+                'patient_id',
+                'professional_id',
+                'therapy_id',
+                'service_type_id',
+                'is_blocked',
+            ])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
+    }
 
     /**
      * Get the patient that owns the schedule.

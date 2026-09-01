@@ -92,6 +92,18 @@ class User extends Authenticatable
         return $this->hasOne(Professional::class, 'user_id');
     }
 
+    /**
+     * Laudos e Documentos, além de admin|manager|administrative, libera pra
+     * profissional multi-terapia (atende alguma terapia além de ABA, mesmo
+     * atendendo ABA também) — mesma regra e mesmo motivo da edição de agenda:
+     * ABA puro continua sem acesso. Ver Professional::atendeTerapiaNaoAba().
+     */
+    public function podeAcessarLaudosDocumentos(): bool
+    {
+        return $this->hasAnyRole(['admin', 'manager', 'administrative'])
+            || (bool) $this->professional?->atendeTerapiaNaoAba();
+    }
+
     public function getAllowedUnitIds(): ?array
     {
         if ($this->isAdmin() || $this->isManager()) {
