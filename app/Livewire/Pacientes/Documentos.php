@@ -45,7 +45,25 @@ class Documentos extends Component
 
     public function abrirPasta(string $pasta)
     {
+        if ($pasta === Document::CATEGORIA_DOCS_PESSOAIS && ! auth()->user()->podeAcessarDocumentosPessoais()) {
+            return;
+        }
+
         $this->pastaAtual = array_key_exists($pasta, Document::PASTAS) ? $pasta : null;
+    }
+
+    /**
+     * SEGURANÇA: abrirPasta() barra a entrada, mas pastaAtual é propriedade pública
+     * comum (não dá pra usar #[Locked] — precisa continuar gravável por abrirPasta())
+     * — uma requisição forjada setando pastaAtual='docs_pessoais' direto contornaria
+     * aquela checagem. Reimposto aqui, no ponto que decide de verdade o que é
+     * consultado/exibido (render() e abrirModal() chamam isto antes de usar pastaAtual).
+     */
+    private function corrigirPastaAtual(): void
+    {
+        if ($this->pastaAtual === Document::CATEGORIA_DOCS_PESSOAIS && ! auth()->user()->podeAcessarDocumentosPessoais()) {
+            $this->pastaAtual = null;
+        }
     }
 
     public function voltarParaPastas()
@@ -63,6 +81,7 @@ class Documentos extends Component
     public function abrirModal()
     {
         $this->autorizarAcesso();
+        $this->corrigirPastaAtual();
         $this->reset(['categoria', 'arquivo']);
         $this->resetValidation();
 
@@ -87,8 +106,12 @@ class Documentos extends Component
     {
         $this->autorizarAcesso();
 
+        // SEGURANÇA: valida contra o conjunto PERMITIDO pro papel do usuário, não
+        // contra todas as categorias — sem isso, alguém sem acesso a Documentos
+        // Pessoais ainda conseguiria escolher essa categoria adulterando o <select>
+        // (ou mandando o valor direto), já que o campo em si é um texto comum.
         $this->validate([
-            'categoria' => ['required', Rule::in(array_keys(Document::CATEGORIA_OPTIONS))],
+            'categoria' => ['required', Rule::in(array_keys($this->categoriasPermitidas()))],
             'arquivo'   => ['required', 'file', 'mimes:' . self::MIMES_PERMITIDOS, 'max:' . self::TAMANHO_MAXIMO_KB],
         ]);
 
@@ -127,6 +150,13 @@ class Documentos extends Component
     {
         $this->autorizarAcesso();
 
+        // Pedido do usuário (02/09/2026): excluir documento salvo é só pra
+        // admin|manager|administrative — mais restrito que o resto da aba (que
+        // também libera coordenador/supervisor/profissional multi-terapia).
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para excluir documentos.');
+        }
+
         $this->documentoDoPaciente($documentId)->delete();
     }
 
@@ -136,8 +166,26 @@ class Documentos extends Component
             ->where('documentable_id', $this->patient->id);
     }
 
+    /**
+     * Categorias que o usuário logado pode ver/escolher — todas, ou todas menos
+     * Documentos Pessoais. Único lugar que decide isso, reaproveitado por render()
+     * (pra filtrar pasta e dropdown) e salvar() (pra validar contra tampering).
+     */
+    private function categoriasPermitidas(): array
+    {
+        if (auth()->user()->podeAcessarDocumentosPessoais()) {
+            return Document::CATEGORIA_OPTIONS;
+        }
+
+        return collect(Document::CATEGORIA_OPTIONS)
+            ->except(Document::CATEGORIA_DOCS_PESSOAIS)
+            ->all();
+    }
+
     public function render()
     {
+        $this->corrigirPastaAtual();
+
         // Contagem por pasta pro badge da grade — uma consulta agregada, não uma por
         // pasta, pra não repetir SELECT sobre a mesma tabela pequena.
         $porCategoria = $this->documentosDoPaciente()
@@ -145,10 +193,18 @@ class Documentos extends Component
             ->groupBy('categoria')
             ->pluck('total', 'categoria');
 
-        $pastas = collect(Document::PASTAS)->map(fn ($pasta) => [
-            ...$pasta,
-            'total' => collect($pasta['categorias'])->sum(fn ($c) => $porCategoria[$c] ?? 0),
-        ]);
+        // Documentos Pessoais (02/09/2026): pasta some da grade pra quem não é
+        // admin|manager|administrative — não só escondida no blade, filtrada aqui,
+        // que é o que também decide o que pastaAtual pode assumir (corrigirPastaAtual).
+        $pastas = collect(Document::PASTAS)
+            ->when(
+                ! auth()->user()->podeAcessarDocumentosPessoais(),
+                fn ($p) => $p->except(Document::CATEGORIA_DOCS_PESSOAIS)
+            )
+            ->map(fn ($pasta) => [
+                ...$pasta,
+                'total' => collect($pasta['categorias'])->sum(fn ($c) => $porCategoria[$c] ?? 0),
+            ]);
 
         $documentos = $this->pastaAtual
             ? $this->documentosDoPaciente()
@@ -161,7 +217,7 @@ class Documentos extends Component
         return view('livewire.pacientes.documentos', [
             'pastas'            => $pastas,
             'documentos'        => $documentos,
-            'categoriaOptions'  => Document::CATEGORIA_OPTIONS,
+            'categoriaOptions'  => $this->categoriasPermitidas(),
         ]);
     }
 }

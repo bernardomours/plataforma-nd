@@ -4,12 +4,20 @@ namespace App\Livewire\Profissionais;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use App\Models\Professional;
 use Illuminate\Support\Carbon;
 
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    // SEGURANÇA (IDOR): sem #[Locked], nada impede uma requisição forjada trocando
+    // este model por $wire.set('professional', <outro id>) — o synthesizer de Eloquent
+    // do Livewire re-resolveria a propriedade pelo ID recebido usando a query PADRÃO
+    // (sem a checagem de unidade feita em mount()), já que mount() não roda de novo em
+    // requisições subsequentes. A tela é só leitura (sem nenhuma ação que dependa de um
+    // "professional" diferente do carregado), então travar por completo é seguro aqui.
+    #[Locked]
     public Professional $professional;
 
     public function mount(Professional $professional)

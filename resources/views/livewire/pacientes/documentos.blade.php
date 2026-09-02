@@ -92,9 +92,11 @@
                                     <a href="{{ route('documentos.baixar', $documento) }}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors">
                                         Baixar
                                     </a>
-                                    <button wire:click="excluir({{ $documento->id }})" wire:confirm="Tem certeza que deseja excluir este documento?" class="text-red-600 hover:text-red-800 font-medium text-sm transition-colors">
-                                        Excluir
-                                    </button>
+                                    @hasanyrole('admin|manager|administrative')
+                                        <button wire:click="excluir({{ $documento->id }})" wire:confirm="Tem certeza que deseja excluir este documento?" class="text-red-600 hover:text-red-800 font-medium text-sm transition-colors">
+                                            Excluir
+                                        </button>
+                                    @endhasanyrole
                                 </td>
                             </tr>
                         @empty
@@ -182,7 +184,13 @@
                             Cancelar
                         </button>
 
-                        <button type="submit" wire:loading.attr="disabled" wire:target="salvar" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-60">
+                        {{-- wire:target inclui "arquivo": sem isso o botão só desabilita
+                             enquanto salvar() roda, não enquanto o arquivo ainda está sendo
+                             enviado ao servidor em segundo plano — com um PDF maior (ex.:
+                             laudo escaneado), dava tempo de clicar em Salvar antes do upload
+                             terminar, e o servidor recebia arquivo=null, acusando "obrigatório"
+                             mesmo com o nome do arquivo já visível na tela. --}}
+                        <button type="submit" wire:loading.attr="disabled" wire:target="salvar,arquivo" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-60">
                             Salvar
                         </button>
                     </div>

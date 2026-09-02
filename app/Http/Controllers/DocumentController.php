@@ -58,6 +58,15 @@ class DocumentController extends Controller
             abort(403, 'Você não tem permissão para acessar este documento.');
         }
 
+        // Documentos Pessoais (02/09/2026) é mais restrito que o resto de Laudos e
+        // Documentos — sem esta checagem, quem tem acesso ao resto da aba (coordenador,
+        // profissional multi-terapia) ainda conseguia visualizar/baixar um documento
+        // dessa categoria sabendo o ID direto na URL, mesmo com a pasta escondida.
+        if ($document->categoria === Document::CATEGORIA_DOCS_PESSOAIS
+            && ! auth()->user()->podeAcessarDocumentosPessoais()) {
+            abort(403, 'Você não tem permissão para acessar este documento.');
+        }
+
         if ($document->documentable_type === Patient::class) {
             $unitId = Patient::withoutGlobalScopes()
                 ->whereKey($document->documentable_id)

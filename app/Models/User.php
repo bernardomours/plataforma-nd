@@ -112,6 +112,17 @@ class User extends Authenticatable
             || (bool) $this->professional?->atendeTerapiaNaoAba();
     }
 
+    /**
+     * Documentos Pessoais (02/09/2026) é uma subcategoria mais restrita dentro de
+     * Laudos e Documentos — pedido do usuário. Só admin|manager|administrative: nem
+     * coordenador/supervisor nem profissional multi-terapia, que já acessam o resto
+     * da aba via podeAcessarLaudosDocumentos(), veem essa pasta específica.
+     */
+    public function podeAcessarDocumentosPessoais(): bool
+    {
+        return $this->hasAnyRole(['admin', 'manager', 'administrative']);
+    }
+
     public function getAllowedUnitIds(): ?array
     {
         if ($this->isAdmin() || $this->isManager()) {

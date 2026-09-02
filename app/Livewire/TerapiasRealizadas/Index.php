@@ -5,6 +5,7 @@ namespace App\Livewire\TerapiasRealizadas;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\PatientService;
@@ -37,7 +38,25 @@ class Index extends Component
     // Trava por vínculo de coordenação/supervisão (PatientService) — null quando o
     // usuário não é coordenador/supervisor (sem trava nenhuma dessa natureza); array
     // (mesmo vazio) quando é, restringindo a query aos pacientes vinculados a ele.
+    //
+    // SEGURANÇA: #[Locked] — sem isso, qualquer propriedade pública do Livewire pode
+    // ser sobrescrita direto do navegador via $wire.set('patientIdsVinculados', [...])
+    // ou uma requisição forjada a /livewire/update, mesmo sem nenhum wire:model
+    // apontando pra ela no blade. Como este array define quais pacientes o coordenador
+    // enxerga, deixá-lo gravável do cliente permitiria escalar pra qualquer paciente da
+    // unidade só adulterando o payload. #[Locked] faz o Livewire rejeitar a tentativa
+    // (CannotUpdateLockedPropertyException) em vez de aceitar o valor adulterado.
+    #[Locked]
     public ?array $patientIdsVinculados = null;
+
+    // SEGURANÇA: mesmo motivo do Locked acima, mas professional_id PRECISA continuar
+    // gravável (admin/coordenador escolhem livremente pelo filtro) — não dá pra travar
+    // a propriedade inteira. Em vez disso, este flag (também Locked) marca quando o
+    // usuário é um profissional restrito à própria agenda, e buildQuery() reimpõe
+    // professional_id = o dele mesmo a cada execução, ignorando qualquer valor
+    // adulterado que tenha chegado do cliente.
+    #[Locked]
+    public bool $isRestrictedProfissional = false;
 
     // para o import da unimed
     public $showImportModal = false;
@@ -63,6 +82,16 @@ class Index extends Component
 
     private function buildQuery()
     {
+        // SEGURANÇA (IDOR): reimpõe professional_id = o do próprio usuário a cada
+        // execução pra quem é profissional restrito — mount() só define o valor
+        // INICIAL, e professional_id não pode ser #[Locked] porque continua gravável
+        // pra admin/coordenador. Sem isso, um profissional comum tamperando
+        // professional_id via $wire.set()/requisição forjada veria as sessões de
+        // qualquer colega da mesma unidade.
+        if ($this->isRestrictedProfissional) {
+            $this->professional_id = auth()->user()->professional?->id ?? 0;
+        }
+
         // SEGURANÇA: withoutGlobalScopes() derrubava IsolatesByUnit E o SoftDeletingScope
         // de uma vez. Aqui a intenção real é apenas continuar exibindo o paciente que já
         // teve saída registrada (soft delete), então removemos SOMENTE o SoftDeletingScope
@@ -428,6 +457,7 @@ class Index extends Component
         }
 
         if ($user->hasRole('profissional') && $user->professional) {
+            $this->isRestrictedProfissional = true;
             $this->professional_id = $user->professional->id;
         }
     }

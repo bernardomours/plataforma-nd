@@ -187,6 +187,39 @@ categoria única já pré-seleciona ela — hoje isso vale pras 5, porque nenhum
 de uma categoria; se voltar a agrupar, a pasta com mais de uma fica em branco de novo (não dá
 pra adivinhar qual).
 
+**Bug corrigido em 02/09/2026: "arquivo obrigatório" mesmo com o arquivo já selecionado.**
+O botão Salvar só desabilitava enquanto a própria ação `salvar` rodava (`wire:target="salvar"`),
+não enquanto o arquivo ainda estava subindo em segundo plano pro servidor
+(`wire:target="arquivo"`, indicador "Enviando..."). Com um PDF pequeno o upload termina rápido e
+ninguém percebe; com um laudo escaneado maior, dava tempo de clicar em Salvar antes do upload
+terminar — o servidor recebia `arquivo = null` nesse instante e a validação `required` disparava,
+mesmo com o nome do arquivo já visível na tela (o navegador mostra o nome assim que o arquivo é
+escolhido, independente do upload já ter chegado ao servidor). Corrigido acrescentando `arquivo`
+ao `wire:target` do botão (`wire:target="salvar,arquivo"`) — agora o botão fica desabilitado do
+momento em que o arquivo é escolhido até o upload realmente terminar, fechando a janela de corrida.
+
+**Documentos Pessoais é mais restrito que o resto da aba (02/09/2026).** Pedido do usuário: só
+`admin|manager|administrative` vê a pasta e sobe documento nela — coordenador, supervisor e
+profissional multi-terapia, que acessam o resto de Laudos e Documentos normalmente
+(`podeAcessarLaudosDocumentos()`), não veem essa pasta específica.
+`User::podeAcessarDocumentosPessoais()` centraliza a regra, reaproveitada em quatro pontos:
+`abrirPasta()` recusa entrar na pasta; `corrigirPastaAtual()` (chamado por `render()` e
+`abrirModal()`) reimpõe a mesma regra sobre `pastaAtual` mesmo se alguém tentar adulterar a
+propriedade direto — `pastaAtual` não pode ser `#[Locked]` porque `abrirPasta()` precisa
+continuar escrevendo nela, então a proteção fica no ponto que decide o que é exibido, não na
+propriedade em si; `salvar()` valida `categoria` contra `categoriasPermitidas()` (o conjunto
+permitido pro papel, não `CATEGORIA_OPTIONS` inteiro), fechando a mesma adulteração por outro
+caminho; e `DocumentController::autorizar()` bloqueia visualizar/baixar um documento já existente
+dessa categoria por ID direto na URL — sem isso, esconder a pasta não impediria alguém de abrir
+um documento de Documentos Pessoais sabendo o link, o que já era exatamente o motivo de
+`autorizar()` existir pro resto da feature.
+
+**Excluir documento salvo também ficou mais restrito (02/09/2026, mesmo pedido).** Só
+`admin|manager|administrative` — nem coordenador nem profissional multi-terapia, mesmo pra
+documento que eles podem ver. Botão escondido no blade (`@hasanyrole`) e `excluir()` repete a
+checagem própria (além do `autorizarAcesso()` de sempre), porque esconder botão não impede uma
+chamada direta ao método via requisição forjada — mesmo padrão de toda a sessão.
+
 Exclusão é soft delete (mesmo padrão do resto do sistema) — o arquivo físico **não** é apagado
 do disco quando o registro é excluído, só fica invisível na tela. Decisão consciente: mantém a
 possibilidade de restaurar e o rastro de auditoria; o custo de armazenamento de manter o

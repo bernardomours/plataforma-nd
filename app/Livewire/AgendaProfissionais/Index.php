@@ -4,6 +4,7 @@ namespace App\Livewire\AgendaProfissionais;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use App\Models\Professional;
 use App\Models\Schedule;
 use App\Models\Patient;
@@ -15,10 +16,19 @@ use Carbon\Carbon;
 class Index extends Component
 {
     public $professional_id = '';
+
+    // SEGURANÇA (IDOR): #[Locked] nos dois — sem isso, um profissional restrito
+    // conseguia $wire.set('isRestricted', false) numa requisição forjada, e
+    // autorizarProfissionalAlvo()/autorizarSchedule() (que só checam quando
+    // isRestricted é true) parariam de barrar nada — abrindo edição da agenda de
+    // QUALQUER profissional só adulterando também professional_id. Mesma classe de
+    // bug do patientIdsVinculados em TerapiasRealizadas\Index (ver CLAUDE.md).
+    #[Locked]
     public $isRestricted = false;
     // Profissional restrito que atende alguma terapia além de ABA pode editar a
     // própria agenda (Agendar Paciente / editar / excluir); ABA puro fica só na
     // visualização. Sempre true fora do caso restrito (admin/manager/... já editam tudo).
+    #[Locked]
     public $podeEditarAgendaPaciente = true;
     public $isBlockModalOpen = false;
     public $block_day = '';

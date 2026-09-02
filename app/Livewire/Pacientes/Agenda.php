@@ -8,6 +8,7 @@ use App\Models\Professional;
 use App\Models\Therapy;
 use App\Models\ServiceType;
 use Livewire\Component;
+use Livewire\Attributes\Locked;
 use Carbon\Carbon;
 
 class Agenda extends Component
@@ -20,7 +21,17 @@ class Agenda extends Component
     // Profissional "puro" (sem papel elevado) que atende terapia além de ABA pode
     // gerenciar a própria agenda aqui, mas só a própria — isRestrictedProfissional
     // governa o filtro de professional_id e a checagem de posse nas ações de escrita.
+    //
+    // SEGURANÇA (IDOR): #[Locked] nos dois — sem isso, $wire.set('podeGerenciarAgenda',
+    // true) numa requisição forjada destravava autorizarEscrita() por completo, e
+    // $wire.set('isRestrictedProfissional', false) fazia autorizarProfissionalAlvo()/
+    // autorizarScheduleAlvo() pararem de checar posse — um profissional restrito
+    // conseguiria gerenciar a agenda de QUALQUER paciente/profissional só adulterando
+    // também professional_id. Mesma classe de bug do isRestricted em
+    // AgendaProfissionais\Index (ver CLAUDE.md).
+    #[Locked]
     public $isRestrictedProfissional = false;
+    #[Locked]
     public $podeGerenciarAgenda = false;
 
     public $day_of_week;
