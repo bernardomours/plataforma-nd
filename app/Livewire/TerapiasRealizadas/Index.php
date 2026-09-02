@@ -392,6 +392,13 @@ class Index extends Component
             return;
         }
 
+        // Qualquer papel não-organizacional que chegue aqui (coordenador, supervisor
+        // ou profissional comum) abre a tela já no mês vigente — pedido do usuário,
+        // estendido de coordenador/supervisor pra profissional também. Valor inicial
+        // dos campos de data, não uma trava: continuam editáveis.
+        $this->start_date = now()->startOfMonth()->format('Y-m-d');
+        $this->end_date = now()->endOfMonth()->format('Y-m-d');
+
         // Coordenador/supervisor vê as crianças que tem vinculadas (mesma fonte de
         // Coordenacao\Vinculos\Index: PatientService.coordinator_id/supervisor_id),
         // não as próprias sessões atendidas. Checado ANTES do bloco "profissional" logo
@@ -408,11 +415,6 @@ class Index extends Component
                 ->unique()
                 ->values()
                 ->all();
-
-            // Coordenador/supervisor abre a tela já no mês vigente — pedido do usuário.
-            // Valor inicial dos campos de data, não uma trava: continuam editáveis.
-            $this->start_date = now()->startOfMonth()->format('Y-m-d');
-            $this->end_date = now()->endOfMonth()->format('Y-m-d');
 
             // Coordenador ABA (papel Spatie coordinator + atende ABA na própria
             // especialidade) abre a tela já filtrada pra ABA — é a terapia que importa

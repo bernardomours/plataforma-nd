@@ -1134,11 +1134,13 @@ pacientes que coordena. Checagem restrita a `coordinator` (não inclui `supervis
 assim que o usuário pediu desta vez — diferente da trava por vínculo acima, que é `coordinator`
 **ou** `supervisor`.
 
-**Coordenador/supervisor também abre a tela já no mês vigente.** `start_date`/`end_date` vêm
-pré-preenchidos com o primeiro e o último dia do mês corrente, no mesmo bloco que calcula
-`patientIdsVinculados` — vale pros dois papéis (diferente do filtro de ABA acima, que é só
-`coordinator`). Também é só valor inicial: os campos de data continuam editáveis, não é uma
-trava. Admin/manager/administrative e profissional puro não são afetados.
+**Qualquer papel não-organizacional abre a tela já no mês vigente.** `start_date`/`end_date`
+vêm pré-preenchidos com o primeiro e o último dia do mês corrente — pedido inicial só pra
+coordenador/supervisor, estendido no mesmo dia pra profissional comum também. Calculado logo
+após o corte de `admin|manager|administrative` no `mount()`, antes de qualquer bloco específico
+de papel, então vale igual pros três (coordenador, supervisor, profissional). Só valor inicial:
+os campos de data continuam editáveis, não é uma trava. Admin/manager/administrative não são
+afetados — a tela deles continua abrindo sem filtro de data.
 
 ---
 
