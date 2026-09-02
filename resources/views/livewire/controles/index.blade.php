@@ -79,7 +79,12 @@
                                     $props = $props ? $props->toArray() : [];
                                 }
 
-                                // 2. Busca da nova coluna 'attribute_changes' se properties estiver vazia
+                                // 2. Busca da nova coluna 'attribute_changes' se properties estiver vazia.
+                                // CORREÇÃO: a condição original só checava isset('attributes'), que um
+                                // evento 'deleted' nunca tem (só grava 'old', o snapshot de antes de
+                                // apagar) — o bloco inteiro era pulado e o snapshot de exclusão sumia
+                                // (paciente virava "removido", detalhes ficavam em branco). Só apareceu
+                                // com Schedule, que foi o primeiro model a logar 'deleted' de verdade.
                                 $mudancasAtributos = $atividade->attribute_changes ?? null;
                                 if ($mudancasAtributos) {
                                     if (is_string($mudancasAtributos)) {
@@ -87,9 +92,9 @@
                                     } elseif (is_object($mudancasAtributos) && method_exists($mudancasAtributos, 'toArray')) {
                                         $mudancasAtributos = $mudancasAtributos->toArray();
                                     }
-                                    
-                                    if (is_array($mudancasAtributos) && isset($mudancasAtributos['attributes'])) {
-                                        $props['attributes'] = $mudancasAtributos['attributes'];
+
+                                    if (is_array($mudancasAtributos) && (isset($mudancasAtributos['attributes']) || isset($mudancasAtributos['old']))) {
+                                        $props['attributes'] = $mudancasAtributos['attributes'] ?? [];
                                         $props['old'] = $mudancasAtributos['old'] ?? [];
                                     }
                                 }

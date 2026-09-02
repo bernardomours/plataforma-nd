@@ -700,6 +700,17 @@ tinha esse contorno pronto antes de existir aqui (comentário "busca da nova col
 `attribute_changes` se properties estiver vazia"); qualquer código novo que leia log de atividade
 tem que ler dali, não de `properties` direto, senão parece que não gravou nada.
 
+**Esse contorno em si tinha um bug (corrigido em 02/09/2026):** só copiava `attribute_changes`
+pra `$props` quando `isset($mudancasAtributos['attributes'])` — mas um evento `deleted` só grava
+`old` (o snapshot de antes de apagar), nunca `attributes`. A condição inteira era pulada, e o
+paciente aparecia como "Removido" com os Detalhes da Mudança em branco, mesmo com o dado
+completo gravado no banco (conferido: `attribute_changes.old` sempre teve os 8 campos). Nunca
+apareceu antes porque `Patient`/`Professional` só logam `created`/`updated` — só ficou visível
+quando `Schedule` passou a logar `deleted` também (ver "Controle de atividades da Agenda").
+Corrigido trocando pra `isset(...['attributes']) || isset(...['old'])`; como o dado já estava
+certo no banco, os logs antigos que apareciam errados na tela se corrigem sozinhos, sem precisar
+de backfill.
+
 **Controle de atividades da Agenda (31/08/2026).** Motivado por profissional multi-terapia
 poder editar a própria agenda em `Pacientes\Agenda` (ver "Edição de agenda por profissional
 multi-terapia") — a coordenação pediu rastreio de **tudo** que muda num horário: dia, horário,
