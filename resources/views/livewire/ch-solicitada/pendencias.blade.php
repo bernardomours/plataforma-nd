@@ -10,6 +10,16 @@
             <input type="month" wire:model.live="mesReferencia" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         </div>
         
+        <div class="w-full md:w-56">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Convênio</label>
+            <select wire:model.live="agreement_id" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="">Todos</option>
+                @foreach($this->agreements as $agreement)
+                    <option value="{{ $agreement->id }}">{{ $agreement->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
         <div class="flex-1 w-full">
             <label class="block text-xs font-semibold text-gray-700 mb-1">Pesquisar Paciente (Opcional)</label>
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Digite o nome para buscar na fila..." class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
