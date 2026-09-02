@@ -16,6 +16,7 @@ use App\Livewire\TerapiasRealizadas\Index as TerapiasRealizadasIndex;
 use App\Livewire\TerapiasRealizadas\Create as TerapiasRealizadasCreate;
 use App\Livewire\TerapiasRealizadas\Edit as TerapiasRealizadasEdit;
 use App\Livewire\ChSolicitada\Index as ChSolicitadaIndex;
+use App\Livewire\ChSolicitada\Faltas as ChSolicitadaFaltas;
 use App\Livewire\Relatorios\Geral as RelatorioGeral;
 use App\Livewire\Coordenacao\Acompanhamentos\Index as AcompanhamentosIndex;
 use App\Livewire\Coordenacao\Cronograma\Index as CronogramaIndex;
@@ -113,6 +114,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin|manager')->group(function () {
         Route::get('/relatorio-geral', RelatorioGeral::class)->name('relatorios.geral');
         Route::get('/ch-solicitada', ChSolicitadaIndex::class)->name('ch-solicitada.index');
+        // Sem item próprio no menu lateral de propósito — alcançável só pelo botão
+        // "Acompanhamento de Faltas" dentro de Controle de CH (ver CLAUDE.md).
+        Route::get('/ch-solicitada/faltas', ChSolicitadaFaltas::class)->name('ch-solicitada.faltas');
     });
 
     Route::middleware('role:admin|manager|avaliador_neuro')->group(function () {

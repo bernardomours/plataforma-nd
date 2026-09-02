@@ -967,6 +967,28 @@ número de sessões faltando (paciente cancela mais de uma sessão no mesmo dia 
 sem que ninguém tenha registrado ainda) — o ícone só aparece quando há pelo menos um registro,
 não tenta bater exatamente com o número ao lado.
 
+**Acompanhamento de Faltas (02/09/2026).** O ícone de detalhe em CH Solicitada só existe nas
+linhas que já vêm de `requested_services` — paciente sem CH cadastrada pro mês/terapia tinha
+falta gravada no banco sem nenhuma tela pra ver (até 652 atendimentos/mês ficam sem CH, ver "Por
+que CH Solicitada e Relatórios Gerais divergem"; o mesmo buraco vale pra falta). `ChSolicitada\
+Faltas` (`/ch-solicitada/faltas`) resolve isso listando **toda** `Falta` do período, com ou sem
+CH — sem item próprio no menu lateral de propósito, só alcançável pelo botão "Acompanhamento de
+Faltas" dentro de Controle de CH (`ChSolicitada\Index`), mesmo grupo de rota (`admin|manager`).
+
+Pra cada falta, `temCh` compara paciente+terapia+mês contra `requested_services` — mesma chave
+de agrupamento de `ChSolicitada\Index` — e marca a linha com selo "Sem CH" (mais o fundo
+avermelhado) quando não bate. **É a métrica central da tela**, não um detalhe: os 4 KPIs do
+topo giram em torno dela (total, quantas sem CH, percentual, motivo mais frequente), e o filtro
+"Mostrar somente faltas sem CH cadastrada" existe justamente pra a coordenação achar rápido quem
+está invisível em Controle de CH. Calculado em lote (`idsComCh()`, uma query pra todas as linhas
+da página) em vez de uma consulta por linha — a tela pode listar o ano inteiro, diferente do
+ícone de CH Solicitada que olha um paciente só por vez.
+
+Competência é Mês + Ano separados, mês vazio = ano inteiro — mesma convenção de
+`Producao\Glosas\Index`, filtrando `faltas.date` por intervalo (nunca `whereYear`/`whereMonth`
+direto na coluna, ver "Armadilhas conhecidas"). Unidade e competência recortam KPIs + lista;
+busca (nome do paciente), motivo e o toggle "sem CH" recortam só a lista.
+
 ---
 
 ## Contrato, reajuste automático e tela de visualização do profissional (02/09/2026)
