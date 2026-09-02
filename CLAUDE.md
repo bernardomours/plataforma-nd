@@ -140,18 +140,25 @@ unidade — mesmo padrão de `AvaliacoesNeuro\Edit::authorizeAssessmentAccess()`
 com `withoutGlobalScopes()` de propósito pra poder negar mesmo quando o scope esconderia o
 registro.
 
-**Laudos e Documentos é `admin|manager|administrative` + profissional multi-terapia**, mais
-restrito que o resto da ficha do paciente (`/pacientes/{patient}` é aberta a qualquer papel
-autenticado de propósito — ver "Autorização"). Justificativa original: laudo é dado de saúde
-mais sensível que agenda/CH. Em 01/09/2026 liberado também pra quem atende terapia além de ABA
-(mesma regra e mesmo motivo de "Edição de agenda por profissional multi-terapia" — quem só faz
-ABA continua sem acesso) — `User::podeAcessarLaudosDocumentos()` centraliza a regra
-(`hasAnyRole(['admin','manager','administrative']) || atendeTerapiaNaoAba()`) pra não duplicar a
-condição nos três lugares que precisam dela: o `@if` da aba em `Pacientes\Show`, o `mount()` (e
-toda ação de escrita) de `Pacientes\Documentos`, e `DocumentController::autorizar()` — esse
-último é o que mais importa, porque é o que segura a porta de verdade (a aba escondida e o
-`mount()` do componente não protegem a rota de visualizar/baixar, que recebe o ID do documento
-direto na URL).
+**Laudos e Documentos é `admin|manager|administrative|coordinator|supervisor` + profissional
+multi-terapia**, mais restrito que o resto da ficha do paciente (`/pacientes/{patient}` é aberta
+a qualquer papel autenticado de propósito — ver "Autorização"). Justificativa original: laudo é
+dado de saúde mais sensível que agenda/CH. Em 01/09/2026 liberado também pra quem atende terapia
+além de ABA (mesma regra e mesmo motivo de "Edição de agenda por profissional multi-terapia" —
+quem só faz ABA continua sem acesso). Em 02/09/2026, bug relatado pelo usuário: coordenador e
+supervisor não enxergavam a aba nem conseguiam abrir o documento — a regra de multi-terapia é
+pensada pro profissional que atende diretamente, não cobre quem coordena/supervisiona sem
+necessariamente atender terapia não-ABA; corrigido acrescentando `coordinator`/`supervisor` ao
+`hasAnyRole()`. `User::podeAcessarLaudosDocumentos()` centraliza a regra
+(`hasAnyRole(['admin','manager','administrative','coordinator','supervisor']) ||
+atendeTerapiaNaoAba()`) pra não duplicar a condição nos três lugares que precisam dela: o `@if`
+da aba em `Pacientes\Show`, o `mount()` (e toda ação de escrita) de `Pacientes\Documentos`, e
+`DocumentController::autorizar()` — esse último é o que mais importa, porque é o que segura a
+porta de verdade (a aba escondida e o `mount()` do componente não protegem a rota de
+visualizar/baixar, que recebe o ID do documento direto na URL). Isolamento por unidade continua
+por fora dessa regra (`canAccessUnit()` em `DocumentController`, global scope de `Patient` nas
+outras duas pontas) — coordenador só vê/abre documento de paciente da própria unidade, igual a
+qualquer outra tela dele.
 
 **A liberação de 01/09 esqueceu o middleware da própria rota.** `DocumentController::autorizar()`
 já tinha a regra nova, mas `/documentos/{document}/visualizar|baixar` continuou com
@@ -962,7 +969,111 @@ não tenta bater exatamente com o número ao lado.
 
 ---
 
+## Contrato, reajuste automático e tela de visualização do profissional (02/09/2026)
+
+Pedido do usuário: `created_at` (quando o cadastro foi digitado na plataforma) diverge de
+quando o profissional começou de fato — nada distinguia as duas datas. Três frentes construídas
+juntas porque a terceira depende das duas primeiras.
+
+**`professionals.contract_date`** (nullable) é a data real de início. `Professional::
+mesesDeEmpresa()` centraliza o cálculo (`contract_date->diffInMonths(now())`, cast pra `int`
+explícito — `diffInMonths()` devolve `float`, e atribuir direto a um retorno `?int` dispara aviso
+de conversão implícita depreciada). Usado pelo comando de reajuste e pela tela de visualização.
+Cadastro antigo sem essa data preenchida devolve `null` — nem o reajuste automático nem a trilha
+de tempo de casa tentam adivinhar.
+
+**`professionals.formacao`** (`App\Enums\ProfessionalFormacao`: Estudante/Graduado/Pós-graduado)
+é **só informativo por decisão do usuário** — existe pra saber a formação de quem atende, sem
+nenhuma lógica de valor ligada a ela por enquanto. Não confundir com gratificação por tempo de
+casa (abaixo), que é a única coisa que mexe em valor hoje.
+
+### Regra de pagamento no cadastro + reajuste automático em 2 marcos fixos
+
+`Profissionais\Create` ganhou uma seção "Regra de pagamento": preenchendo Terapia/Tipo/Convênio
+(qualquer um vazio funciona como curinga, igual em `RegrasPagamento`) + Valor + Valor de
+Reajuste, confirmar o cadastro já sobe a `ProfessionalPaymentRule` pra Produção — evita o
+trabalho duplicado de cadastrar o profissional e depois abrir Regras de Pagamento à parte.
+`Profissionais\Edit` **não** ganhou esses campos de propósito: regra de pagamento continua
+existindo e sendo editada só via `RegrasPagamento`, mantendo "um profissional, N regras
+independentes" limpo — cadastro só cria a primeira regra, não vira uma segunda tela de edição
+dela.
+
+**Não é reajuste recorrente — são exatamente 2 marcos fixos**, 9 e 18 meses após `contract_date`
+(confirmado com o usuário depois de uma leitura inicial errada do pedido, que teria implementado
+"a cada 9 meses para sempre"). `professional_payment_rules` ganhou `valor_base` (congelado no
+valor da criação, nunca tocado depois — mesmo padrão de `planned_sessions`/CH), `valor_reajuste`
+e duas colunas de data, `reajuste_9_meses_aplicado_em`/`reajuste_18_meses_aplicado_em`. O estado
+"já aplicou" é rastreado por **essas datas em si**, não inferido comparando `amount` com
+`valor_base` — de propósito, pra continuar correto mesmo se alguém ajustar `amount` manualmente
+pela tela de `RegrasPagamento` sem mexer nesse bookkeeping.
+
+`php artisan profissionais:aplicar-reajustes [--fix]`, mesmo padrão diagnóstico de todo comando
+deste projeto (tabela de simulação sem `--fix`, `activity()` com `origem` no log ao aplicar).
+Agendado `dailyAt('06:00')` em `routes/console.php`, ao lado de `send-birthday-emails` — decisão
+do usuário ("automático, todo dia") em vez de manual. Se os dois marcos vencerem entre duas
+execuções (profissional com `contract_date` antigo recebendo a regra só agora, por exemplo), o
+comando aplica os dois de uma vez na mesma passada (soma os dois `valor_reajuste`) em vez de
+esperar o próximo dia — sem isso o segundo marco ficaria "preso" atrás do primeiro
+indefinidamente, já que nada re-dispara o comando fora do agendamento diário.
+
+### `RegrasPagamento\Index`: inativo escondido por padrão
+
+Comportamento anterior (profissional inativado continuar na listagem) era **intencional**, não
+descuido — tinha comentário explicando que era pra não perder o histórico da regra. O usuário
+pediu o padrão trocado sem perder o dado: `$mostrarInativos` (toggle, `false` por padrão) some
+com quem já saiu, mas continua alcançável marcando a caixa — nada foi apagado nem deixou de
+existir, só mudou o que aparece sem pedir.
+
+### `Profissionais\Show`: nova tela de visualização
+
+Troca o antigo botão "Editar" da listagem por "Visualizar Dados" (mesmo texto/ícone de
+`Pacientes\Index`) — `profissionais.show`, rota `/profissionais/{professional}/visualizar`,
+mesmo grupo de middleware (`role:admin|manager|administrative`) do resto de Profissionais.
+Cadastro (dados gerais, contrato, formação, vínculos) fica ali; editar continua em rota própria,
+acessível por um botão dentro da tela de visualização — mesma relação que `Pacientes\Show` tem
+com `Pacientes\Edit`.
+
+Somente leitura, então a rota é `->withTrashed()`: diferente de Edit (que não abre profissional
+inativado), a tela existe também pra auditar histórico de pagamento de quem já saiu, sem
+precisar restaurar o cadastro só pra olhar.
+
+**A trilha de reajuste é o elemento central da seção de pagamento**: Contratação → 9 meses → 18
+meses, cada marco com estado (Aplicado com data / Aguardando processamento / Previsto com data
+calculada / Sem data de contrato) resolvido por `Show::statusDoMarco()` a partir das colunas
+`*_aplicado_em` — não recalcula nada, só interpreta o que `profissionais:aplicar-reajustes` já
+gravou. Regra com `payment_type` diferente de "por sessão" ganha um aviso lembrando que esse
+tipo ainda não entra no fechamento de produção (ver "O buraco do repasse") — informação que já
+existia no sistema mas não aparecia em lugar nenhum pro usuário perceber olhando o cadastro.
+
+**Armadilha do Livewire que motivou a linha abaixo em "Armadilhas conhecidas":** a primeira
+versão do `mount()` tentava resolver o profissional manualmente (`Professional::withTrashed()->
+findOrFail($professional)`) com um parâmetro sem tipo, mas a propriedade pública continuava
+tipada `Professional $professional` — mesmo nome do parâmetro de rota `{professional}`. Isso
+fazia o Livewire resolver o model sozinho *antes* do corpo do `mount()` rodar, entregando pro
+parâmetro a instância já resolvida (pela query padrão, sem `withTrashed`) em vez do ID cru — o
+`findOrFail()` manual então rodava com um objeto no lugar de um id, nunca casava, e todo acesso
+virava 404 sem exceção nenhuma no log (`ModelNotFoundException` não é reportada por padrão).
+Corrigido virando o padrão de `Pacientes\Show`: tipar o parâmetro do `mount()`
+(`mount(Professional $professional)`), deixar o Livewire resolver via binding implícito, e
+acrescentar `->withTrashed()` na definição da rota pra cobrir o caso de profissional inativado
+(equivalente ao `Route::withTrashed()` nativo do Laravel, que o `Livewire\Drawer\
+ImplicitRouteBinding` respeita). Autorização por unidade e eager load acontecem depois, dentro
+do `mount()`, sobre o model já resolvido.
+
+---
+
 ## Armadilhas conhecidas
+
+**Propriedade pública tipada com o mesmo nome do parâmetro de rota, em componente Livewire
+full-page.** `public Professional $professional` numa rota `{professional}` faz o Livewire
+resolver o model sozinho *antes* de `mount()` rodar (`Livewire\Drawer\ImplicitRouteBinding::
+resolveComponentProps()`), usando a query **padrão** do model (sem `withTrashed`, sem eager
+load). Um `findOrFail()` manual dentro do `mount()` recebe a instância já resolvida no lugar do
+id esperado e nunca casa — vira 404 silencioso, sem nada no log (`ModelNotFoundException` não é
+reportada por padrão). Duas saídas: ou tipar o parâmetro do `mount()` com o model e deixar o
+binding implícito resolver (acrescentando `Route::withTrashed()` se precisar cobrir soft
+delete), ou dar à propriedade um nome que não colida com o parâmetro de rota. Foi o bug de
+`Profissionais\Show` — ver seção acima.
 
 **Blade grudado em palavra.** `Manual@if(...)` não compila a diretiva (exige que não haja
 caractere de palavra antes do arroba), mas o `@endif` compila — sobra `endif` órfão e o parser

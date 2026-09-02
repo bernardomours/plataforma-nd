@@ -4,10 +4,14 @@ namespace App\Livewire\Profissionais;
 
 use Livewire\Component;
 use App\Models\Professional;
+use App\Models\ProfessionalPaymentRule;
 use App\Models\Unit;
 use App\Models\Therapy;
+use App\Models\Agreement;
+use App\Models\ServiceType;
 use App\Models\User;
 use App\Enums\ProfessionalRole;
+use App\Enums\ProfessionalFormacao;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -15,10 +19,19 @@ use Illuminate\Validation\Rule;
 #[Layout('layouts.app')]
 class Create extends Component
 {
-    public $name, $cpf, $phone, $birth_date, $register_number, $email, $role;
-    
+    public $name, $cpf, $phone, $birth_date, $contract_date, $register_number, $email, $role, $formacao;
+
     public $selectedUnits = [];
     public $selectedTherapies = [];
+
+    // Regra de pagamento (opcional): preenchendo o valor, já sobe pra Produção junto
+    // com o cadastro, sem precisar passar por Regras de Pagamento depois.
+    public $payment_amount = '';
+    public $payment_type = 'por_sessao';
+    public $payment_valor_reajuste = '';
+    public $payment_therapy_id = '';
+    public $payment_service_type_id = '';
+    public $payment_agreement_id = '';
 
     public function rules()
     {
@@ -27,14 +40,26 @@ class Create extends Component
             'cpf' => 'required|string|max:14|unique:professionals,cpf',
             'phone' => 'required|string|max:20',
             'birth_date' => 'required|date',
+            // Nullable de propósito: cadastro antigo não tinha esse campo, e nem todo
+            // cadastro novo necessariamente sabe a data exata na hora de cadastrar.
+            'contract_date' => 'nullable|date',
             'register_number' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'role' => 'required',
+            'formacao' => ['nullable', Rule::in(array_column(ProfessionalFormacao::cases(), 'value'))],
             'selectedUnits' => 'required|array|min:1',
             // SEGURANÇA: impede cadastrar profissional em unidade que o usuário não
             // administra (validação no backend, não só no select da view).
             'selectedUnits.*' => ['integer', Rule::in($this->unidadesPermitidas()->pluck('id')->all())],
             'selectedTherapies' => 'nullable|array',
+            // Regra de pagamento inteira é opcional — só payment_type fica amarrado a
+            // ter um valor, pra não gravar regra sem saber como ela é cobrada.
+            'payment_amount' => 'nullable|numeric|min:0',
+            'payment_type' => 'nullable|required_with:payment_amount|in:por_sessao,por_hora,por_dia',
+            'payment_valor_reajuste' => 'nullable|numeric|min:0',
+            'payment_therapy_id' => 'nullable|exists:therapies,id',
+            'payment_service_type_id' => 'nullable|exists:service_types,id',
+            'payment_agreement_id' => 'nullable|exists:agreements,id',
         ];
     }
 
@@ -69,15 +94,36 @@ class Create extends Component
             'cpf' => $this->cpf,
             'phone' => $this->phone,
             'birth_date' => $this->birth_date,
+            'contract_date' => $this->contract_date ?: null,
             'register_number' => $this->register_number,
             'email' => $this->email,
             'role' => $this->role,
+            'formacao' => $this->formacao ?: null,
         ]);
 
         $professional->units()->sync($this->selectedUnits);
-        
+
         if (!empty($this->selectedTherapies)) {
             $professional->therapies()->sync($this->selectedTherapies);
+        }
+
+        // Regra de pagamento já sobe pra Produção no ato do cadastro, se um valor foi
+        // informado — evita ter que repetir o cadastro em Regras de Pagamento depois.
+        if ($this->payment_amount !== '' && $this->payment_amount !== null) {
+            $valorInicial = (float) str_replace(',', '.', (string) $this->payment_amount);
+
+            ProfessionalPaymentRule::create([
+                'professional_id' => $professional->id,
+                'payment_type' => $this->payment_type ?: 'por_sessao',
+                'amount' => $valorInicial,
+                'valor_base' => $valorInicial,
+                'valor_reajuste' => $this->payment_valor_reajuste !== '' && $this->payment_valor_reajuste !== null
+                    ? (float) str_replace(',', '.', (string) $this->payment_valor_reajuste)
+                    : null,
+                'therapy_id' => $this->payment_therapy_id ?: null,
+                'service_type_id' => $this->payment_service_type_id ?: null,
+                'agreement_id' => $this->payment_agreement_id ?: null,
+            ]);
         }
 
         if (!empty($this->email)) {
@@ -126,10 +172,13 @@ class Create extends Component
         session()->flash('message', "Profissional {$professional->name} cadastrado com sucesso.");
 
         $this->reset([
-            'name', 'cpf', 'phone', 'birth_date', 'register_number', 
-            'email', 'role', 'selectedUnits', 'selectedTherapies'
+            'name', 'cpf', 'phone', 'birth_date', 'contract_date', 'register_number',
+            'email', 'role', 'formacao', 'selectedUnits', 'selectedTherapies',
+            'payment_amount', 'payment_valor_reajuste', 'payment_therapy_id',
+            'payment_service_type_id', 'payment_agreement_id',
         ]);
-        
+        $this->payment_type = 'por_sessao';
+
         $this->dispatch('clear-tom-selects');
     }
 
@@ -139,6 +188,9 @@ class Create extends Component
             // SEGURANÇA: select restrito às unidades permitidas ao usuário.
             'units' => $this->unidadesPermitidas(),
             'therapies' => Therapy::all(),
+            'agreements' => Agreement::orderBy('name')->get(),
+            'serviceTypes' => ServiceType::orderBy('name')->get(),
+            'formacaoOptions' => ProfessionalFormacao::cases(),
             'roles' => ProfessionalRole::cases()
         ]);
     }

@@ -109,6 +109,13 @@
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700">Data de Contrato</label>
+                    <input wire:model="contract_date" type="date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Quando ele começou de fato — pode ser diferente da data deste cadastro.</p>
+                    @error('contract_date') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700">Número de Registro</label>
                     <input wire:model="register_number" type="text" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('register_number') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
@@ -118,6 +125,17 @@
                     <label class="block text-sm font-medium text-gray-700">Email</label>
                     <input wire:model="email" type="email" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('email') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Formação</label>
+                    <select wire:model="formacao" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Não informado</option>
+                        @foreach($formacaoOptions as $formacaoOption)
+                            <option value="{{ $formacaoOption->value }}">{{ $formacaoOption->getLabel() }}</option>
+                        @endforeach
+                    </select>
+                    @error('formacao') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
             </div>
 
@@ -185,6 +203,71 @@
                         </select>
                     </div>
                     @error('selectedTherapies') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <div>
+                <h3 class="text-sm font-semibold text-gray-800">Regra de pagamento</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Opcional. Preenchendo o valor, a regra já sobe pra Produção junto com o cadastro — não precisa cadastrar de novo em Regras de Pagamento.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Terapia</label>
+                        <select wire:model="payment_therapy_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todas</option>
+                            @foreach($therapies as $therapy)
+                                <option value="{{ $therapy->id }}">{{ $therapy->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('payment_therapy_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tipo de atendimento</label>
+                        <select wire:model="payment_service_type_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todos</option>
+                            @foreach($serviceTypes as $serviceType)
+                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('payment_service_type_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Convênio</label>
+                        <select wire:model="payment_agreement_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todos</option>
+                            @foreach($agreements as $agreement)
+                                <option value="{{ $agreement->id }}">{{ $agreement->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('payment_agreement_id') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tipo de pagamento</label>
+                        <select wire:model="payment_type" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="por_sessao">Por sessão</option>
+                            <option value="por_hora">Por hora</option>
+                            <option value="por_dia">Por dia</option>
+                        </select>
+                        @error('payment_type') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Valor (R$)</label>
+                        <input wire:model="payment_amount" type="text" inputmode="decimal" placeholder="18.00" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        @error('payment_amount') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Valor de reajuste (R$)</label>
+                        <input wire:model="payment_valor_reajuste" type="text" inputmode="decimal" placeholder="2.00" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Somado ao valor com 9 e com 18 meses de contrato. Deixe em branco se não houver reajuste combinado.</p>
+                        @error('payment_valor_reajuste') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                    </div>
                 </div>
             </div>
 

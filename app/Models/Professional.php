@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProfessionalFormacao;
 use App\Enums\ProfessionalRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,9 +38,11 @@ class Professional extends Model
         'cpf',
         'phone',
         'birth_date',
+        'contract_date',
         'register_number',
         'email',
         'role',
+        'formacao',
         'deletion_reason',
         'user_id'
     ];
@@ -54,7 +57,9 @@ class Professional extends Model
         return [
             'id' => 'integer',
             'birth_date' => 'date',
+            'contract_date' => 'date',
             'role' => ProfessionalRole::class,
+            'formacao' => ProfessionalFormacao::class,
         ];
     }
 
@@ -105,6 +110,21 @@ class Professional extends Model
         return $this->therapies()->where('name', 'ABA')->exists();
     }
 
+    /**
+     * Tempo de casa em meses inteiros, a partir de `contract_date` (não `created_at` —
+     * ver migration). Null quando a data de contrato não foi preenchida (cadastros
+     * antigos, anteriores a este campo). Usado pelo comando de reajuste automático e
+     * pela tela de visualização do profissional.
+     */
+    public function mesesDeEmpresa(): ?int
+    {
+        if (! $this->contract_date) {
+            return null;
+        }
+
+        return (int) $this->contract_date->diffInMonths(now());
+    }
+
 
     /**
      * Campos do cadastro do profissional que entram na auditoria.
@@ -130,8 +150,10 @@ class Professional extends Model
                 'phone',
                 'email',
                 'birth_date',
+                'contract_date',
                 'register_number',
                 'role',
+                'formacao',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()

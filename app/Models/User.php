@@ -97,10 +97,18 @@ class User extends Authenticatable
      * profissional multi-terapia (atende alguma terapia além de ABA, mesmo
      * atendendo ABA também) — mesma regra e mesmo motivo da edição de agenda:
      * ABA puro continua sem acesso. Ver Professional::atendeTerapiaNaoAba().
+     *
+     * coordinator|supervisor entraram em 02/09/2026: coordenação/supervisão precisa
+     * ver e baixar laudo de qualquer paciente que acompanha, independente da própria
+     * terapia — a regra de multi-terapia é pensada pro profissional que atende
+     * diretamente, não pra quem coordena. 'supervisor' não existe hoje como papel
+     * Spatie atribuído (só coordinator, na prática — ver "Autorização" no CLAUDE.md),
+     * mas fica na checagem pelo mesmo motivo de outras telas de Coordenação: não
+     * precisa mexer em código de novo se o papel passar a ser usado.
      */
     public function podeAcessarLaudosDocumentos(): bool
     {
-        return $this->hasAnyRole(['admin', 'manager', 'administrative'])
+        return $this->hasAnyRole(['admin', 'manager', 'administrative', 'coordinator', 'supervisor'])
             || (bool) $this->professional?->atendeTerapiaNaoAba();
     }
 

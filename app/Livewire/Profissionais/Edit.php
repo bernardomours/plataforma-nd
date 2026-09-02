@@ -8,6 +8,7 @@ use App\Models\Unit;
 use App\Models\Therapy;
 use App\Models\User;
 use App\Enums\ProfessionalRole;
+use App\Enums\ProfessionalFormacao;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -15,9 +16,9 @@ use Illuminate\Validation\Rule;
 #[Layout('layouts.app')]
 class Edit extends Component
 {
-    public $professionalId; 
+    public $professionalId;
 
-    public $name, $cpf, $phone, $birth_date, $register_number, $email, $role;
+    public $name, $cpf, $phone, $birth_date, $contract_date, $register_number, $email, $role, $formacao;
     public $selectedUnits = [];
     public $selectedTherapies = [];
 
@@ -37,9 +38,11 @@ class Edit extends Component
         $this->cpf = $record->cpf;
         $this->phone = $record->phone;
         $this->birth_date = $record->birth_date ? $record->birth_date->format('Y-m-d') : null;
+        $this->contract_date = $record->contract_date ? $record->contract_date->format('Y-m-d') : null;
         $this->register_number = $record->register_number;
         $this->email = $record->email;
         $this->role = $record->role->value ?? $record->role;
+        $this->formacao = $record->formacao?->value;
 
         $this->selectedUnits = $record->units->pluck('id')->map(fn($id) => (string) $id)->toArray();
         $this->selectedTherapies = $record->therapies->pluck('id')->map(fn($id) => (string) $id)->toArray();
@@ -78,9 +81,11 @@ class Edit extends Component
             'cpf' => 'required|string|max:14|unique:professionals,cpf,' . $this->professionalId,
             'phone' => 'required|string|max:20',
             'birth_date' => 'required|date',
+            'contract_date' => 'nullable|date',
             'register_number' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'role' => 'required',
+            'formacao' => ['nullable', Rule::in(array_column(ProfessionalFormacao::cases(), 'value'))],
             'selectedUnits' => 'required|array|min:1',
             // SEGURANÇA: impede que o usuário injete no payload uma unidade que não
             // administra (escalar o profissional para outra clínica). Preserva as
@@ -131,9 +136,11 @@ class Edit extends Component
             'cpf' => $this->cpf,
             'phone' => $this->phone,
             'birth_date' => $this->birth_date,
+            'contract_date' => $this->contract_date ?: null,
             'register_number' => $this->register_number,
             'email' => $this->email,
             'role' => $this->role,
+            'formacao' => $this->formacao ?: null,
         ]);
 
         $record->units()->sync($this->selectedUnits);
@@ -192,7 +199,8 @@ class Edit extends Component
             // normal desvincularia o profissional dessas unidades sem o usuário perceber.
             'units' => Unit::whereIn('id', $this->unidadesAtribuiveisIds())->get(),
             'therapies' => Therapy::all(),
-            'roles' => ProfessionalRole::cases()
+            'roles' => ProfessionalRole::cases(),
+            'formacaoOptions' => ProfessionalFormacao::cases(),
         ]);
     }
 }

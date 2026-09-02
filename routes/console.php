@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('app:send-birthday-emails')->dailyAt('08:00');
+Schedule::command('profissionais:aplicar-reajustes --fix')->dailyAt('06:00');

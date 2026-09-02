@@ -50,7 +50,7 @@
                 </select>
             </div>
 
-            @if($busca !== '' || $unidade_id)
+            @if($busca !== '' || $unidade_id || $mostrarInativos)
                 <button type="button" wire:click="limparFiltros"
                         class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
                     Limpar filtros
@@ -58,12 +58,19 @@
             @endif
         </div>
 
-        <p class="mt-3 text-xs text-gray-500">
-            {{ $regras->total() }} {{ $regras->total() === 1 ? 'regra encontrada' : 'regras encontradas' }}
-            @if($busca !== '' || $unidade_id)
-                <span class="text-gray-400">— de {{ \App\Models\ProfessionalPaymentRule::count() }} no total</span>
-            @endif
-        </p>
+        <div class="mt-3 flex items-center justify-between flex-wrap gap-2">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" wire:model.live="mostrarInativos" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                <span class="text-sm text-gray-700">Mostrar profissionais inativos</span>
+            </label>
+
+            <p class="text-xs text-gray-500">
+                {{ $regras->total() }} {{ $regras->total() === 1 ? 'regra encontrada' : 'regras encontradas' }}
+                @if($busca !== '' || $unidade_id || $mostrarInativos)
+                    <span class="text-gray-400">— de {{ \App\Models\ProfessionalPaymentRule::count() }} no total</span>
+                @endif
+            </p>
+        </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -130,7 +137,7 @@
                     @empty
                         <tr>
                             <td colspan="7" class="py-8 text-center text-gray-500 text-sm">
-                                @if($busca !== '' || $unidade_id)
+                                @if($busca !== '' || $unidade_id || $mostrarInativos)
                                     Nenhuma regra encontrada para os filtros aplicados.
                                     <button type="button" wire:click="limparFiltros" class="ml-1 font-semibold text-blue-600 hover:text-blue-700">
                                         Limpar filtros
@@ -199,6 +206,18 @@
                                         <input type="text" wire:model="amount" class="w-full pl-9 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="0.00">
                                     </div>
                                     @error('amount') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div class="col-span-2 md:col-span-1">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Valor de Reajuste (R$)</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span class="text-gray-500 sm:text-sm">R$</span>
+                                        </div>
+                                        <input type="text" wire:model="valor_reajuste" class="w-full pl-9 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="0.00">
+                                    </div>
+                                    <p class="text-xs text-gray-400 mt-1">Somado ao valor com 9 e com 18 meses de contrato do profissional. Deixe em branco se não houver reajuste combinado.</p>
+                                    @error('valor_reajuste') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                                 </div>
 
                                 <div class="col-span-2 mt-4">

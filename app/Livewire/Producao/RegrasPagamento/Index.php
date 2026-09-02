@@ -23,11 +23,16 @@ class Index extends Component
 
     public string $busca = '';
     public $unidade_id = '';
+    // Por padrão a listagem só mostra regras de profissional ATIVO — profissional
+    // inativado continua na base (histórico não se apaga), mas some da tela por padrão.
+    // O toggle existe pra quem precisa conferir/auditar uma regra antiga.
+    public bool $mostrarInativos = false;
 
     public $regra_id = null;
     public $professional_id = '';
     public $payment_type = 'por_sessao';
     public $amount = '';
+    public $valor_reajuste = '';
     public $therapy_id = '';
     public $agreement_id = '';
     public $service_type_id = ''; // <-- Nova propriedade
@@ -43,6 +48,7 @@ class Index extends Component
             'professional_id' => 'required|exists:professionals,id',
             'payment_type' => 'required|in:por_sessao,por_hora,por_dia',
             'amount' => 'required|numeric|min:0',
+            'valor_reajuste' => 'nullable|numeric|min:0',
             'therapy_id' => 'nullable|exists:therapies,id',
             'agreement_id' => 'nullable|exists:agreements,id',
             // Certifique-se de que o nome da tabela no BD seja 'service_types', caso contrário, ajuste abaixo:
@@ -75,9 +81,14 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatingMostrarInativos()
+    {
+        $this->resetPage();
+    }
+
     public function limparFiltros()
     {
-        $this->reset(['busca', 'unidade_id']);
+        $this->reset(['busca', 'unidade_id', 'mostrarInativos']);
         $this->resetPage();
     }
 
@@ -96,6 +107,7 @@ class Index extends Component
         $this->professional_id = $regra->professional_id;
         $this->payment_type = $regra->payment_type;
         $this->amount = $regra->amount;
+        $this->valor_reajuste = $regra->valor_reajuste;
         $this->therapy_id = $regra->therapy_id;
         $this->agreement_id = $regra->agreement_id;
         $this->service_type_id = $regra->service_type_id; // <-- Preenchendo ao editar
@@ -107,17 +119,28 @@ class Index extends Component
     {
         $this->validate();
 
-        ProfessionalPaymentRule::updateOrCreate(
-            ['id' => $this->regra_id],
-            [
-                'professional_id' => $this->professional_id,
-                'payment_type' => $this->payment_type,
-                'amount' => str_replace(',', '.', $this->amount),
-                'therapy_id' => $this->therapy_id ?: null,
-                'agreement_id' => $this->agreement_id ?: null,
-                'service_type_id' => $this->service_type_id ?: null, // <-- Salvando no banco
-            ]
-        );
+        $valorNumerico = (float) str_replace(',', '.', $this->amount);
+        $reajusteNumerico = ($this->valor_reajuste !== '' && $this->valor_reajuste !== null)
+            ? (float) str_replace(',', '.', $this->valor_reajuste)
+            : null;
+
+        $dados = [
+            'professional_id' => $this->professional_id,
+            'payment_type' => $this->payment_type,
+            'amount' => $valorNumerico,
+            'valor_reajuste' => $reajusteNumerico,
+            'therapy_id' => $this->therapy_id ?: null,
+            'agreement_id' => $this->agreement_id ?: null,
+            'service_type_id' => $this->service_type_id ?: null,
+        ];
+
+        if ($this->regra_id) {
+            // valor_base NÃO entra aqui de propósito: fica congelado desde a criação da
+            // regra, mesmo que o valor vigente (amount) seja ajustado manualmente depois.
+            ProfessionalPaymentRule::whereKey($this->regra_id)->update($dados);
+        } else {
+            ProfessionalPaymentRule::create([...$dados, 'valor_base' => $valorNumerico]);
+        }
 
         $this->fecharModal();
     }
@@ -143,7 +166,7 @@ class Index extends Component
 
     public function resetForm()
     {
-        $this->reset(['regra_id', 'professional_id', 'therapy_id', 'agreement_id', 'service_type_id', 'amount']);
+        $this->reset(['regra_id', 'professional_id', 'therapy_id', 'agreement_id', 'service_type_id', 'amount', 'valor_reajuste']);
         $this->payment_type = 'por_sessao';
         $this->resetValidation();
     }
@@ -173,6 +196,9 @@ class Index extends Component
                 DB::table('professional_unit')
                     ->where('unit_id', $this->unidade_id)
                     ->select('professional_id')))
+            // Professional::query() (sem withTrashed) já exclui inativado pelo scope
+            // padrão do SoftDeletes — reaproveita isso em vez de duplicar a condição.
+            ->when(! $this->mostrarInativos, fn ($q) => $q->whereIn('professional_id', Professional::query()->select('id')))
             ->orderBy($nomeDoProfissional)
             ->orderBy('id')
             ->paginate(10);

@@ -9,6 +9,7 @@ use App\Livewire\Pacientes\Show as PacientesShow;
 use App\Livewire\Profissionais\Index as ProfissionaisIndex;
 use App\Livewire\Profissionais\Create as ProfissionaisCreate;
 use App\Livewire\Profissionais\Edit as ProfissionaisEdit;
+use App\Livewire\Profissionais\Show as ProfissionaisShow;
 use App\Livewire\Profissionais\Aniversariantes as ProfissionaisAniversariantes;
 use App\Livewire\Servicos\Index as ServicosIndex;
 use App\Livewire\TerapiasRealizadas\Index as TerapiasRealizadasIndex;
@@ -94,6 +95,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/profissionais', ProfissionaisIndex::class)->name('profissionais.index');
         Route::get('/profissionais/cadastrar', ProfissionaisCreate::class)->name('profissionais.create');
         Route::get('/profissionais/{professional}/editar', ProfissionaisEdit::class)->name('profissionais.edit');
+        // withTrashed(): visualização é só leitura e precisa continuar acessível pra
+        // profissional inativado (auditoria de histórico de pagamento) — ver Show::mount().
+        Route::get('/profissionais/{professional}/visualizar', ProfissionaisShow::class)->name('profissionais.show')->withTrashed();
         Route::get('/profissionais/aniversariantes', ProfissionaisAniversariantes::class)->name('profissionais.aniversariantes');
         Route::get('/solicitacao-ch', ChPendencias::class)->name('ch.solicitacao');
     });

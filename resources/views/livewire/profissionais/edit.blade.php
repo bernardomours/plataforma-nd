@@ -99,6 +99,13 @@
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700">Data de Contrato</label>
+                    <input wire:model="contract_date" type="date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Quando ele começou de fato — usada pro reajuste automático por tempo de casa.</p>
+                    @error('contract_date') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700">Número de Registro</label>
                     <input wire:model="register_number" type="text" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('register_number') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
@@ -108,6 +115,17 @@
                     <label class="block text-sm font-medium text-gray-700">Email</label>
                     <input wire:model="email" type="email" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('email') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Formação</label>
+                    <select wire:model="formacao" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Não informado</option>
+                        @foreach($formacaoOptions as $formacaoOption)
+                            <option value="{{ $formacaoOption->value }}">{{ $formacaoOption->getLabel() }}</option>
+                        @endforeach
+                    </select>
+                    @error('formacao') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                 </div>
             </div>
 
