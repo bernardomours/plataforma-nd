@@ -153,6 +153,15 @@ toda ação de escrita) de `Pacientes\Documentos`, e `DocumentController::autori
 `mount()` do componente não protegem a rota de visualizar/baixar, que recebe o ID do documento
 direto na URL).
 
+**A liberação de 01/09 esqueceu o middleware da própria rota.** `DocumentController::autorizar()`
+já tinha a regra nova, mas `/documentos/{document}/visualizar|baixar` continuou com
+`role:admin|manager|administrative` no `routes/web.php` — middleware de rota roda **antes** do
+controller, então profissional multi-terapia via a aba, via a lista de documentos (Livewire, já
+usava a regra nova), mas levava 403 ao clicar em Visualizar/Baixar, sem nunca chegar em
+`autorizar()`. Corrigido removendo o middleware da rota: como o controller já faz a checagem
+completa (papel + unidade) sozinho, o middleware não protegia nada a mais — só duplicava com uma
+regra mais velha e mais estreita, e por rodar primeiro era ela que valia.
+
 Isolamento por unidade **não precisou de código extra**: `Patient` já tem o global scope de
 `IsolatesByUnit`, então o route model binding do `{patient}` já filtra por unidade antes do
 componente sequer montar — diferente de `NeuroAssessment`, que não tem `unit_id` e precisou de

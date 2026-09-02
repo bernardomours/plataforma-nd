@@ -61,10 +61,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Laudos e Documentos: rota dedicada (não ação do Livewire), pra abrir de verdade
     // numa aba nova. O ID chega direto na URL, então o controller repete papel +
     // isolamento por unidade — não dá pra confiar só no @hasanyrole da aba.
-    Route::middleware('role:admin|manager|administrative')->group(function () {
-        Route::get('/documentos/{document}/visualizar', [DocumentController::class, 'visualizar'])->name('documentos.visualizar');
-        Route::get('/documentos/{document}/baixar', [DocumentController::class, 'baixar'])->name('documentos.baixar');
-    });
+    //
+    // SEM middleware 'role:' aqui de propósito: até 01/09/2026 tinha
+    // 'role:admin|manager|administrative', e isso bloqueava profissional multi-terapia
+    // (User::podeAcessarLaudosDocumentos() já libera pra ele desde a mudança de
+    // 01/09) ANTES da requisição sequer chegar em DocumentController::autorizar() —
+    // middleware de rota roda primeiro. O controller já faz a checagem completa
+    // (papel + unidade) sozinho; o middleware aqui só duplicava com uma regra mais
+    // antiga e mais estreita, e como middleware de rota vence, era a regra que valia.
+    Route::get('/documentos/{document}/visualizar', [DocumentController::class, 'visualizar'])->name('documentos.visualizar');
+    Route::get('/documentos/{document}/baixar', [DocumentController::class, 'baixar'])->name('documentos.baixar');
 
     // COORDENACAO
     Route::get('/acompanhamentos', AcompanhamentosIndex::class)->name('acompanhamentos.index');
