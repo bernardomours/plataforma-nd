@@ -47,12 +47,13 @@ class Agenda extends Component
 
         $papelOrganizacional = $user->hasAnyRole(['admin', 'manager', 'administrative']);
 
-        // Mesma regra de AgendaProfissionais\Index::mount() — coordinator/supervisor só
-        // mantém edição irrestrita (agenda de qualquer paciente) se atender ABA.
-        $coordenaAba = $user->hasAnyRole(['coordinator', 'supervisor'])
-            && ($user->professional?->atendeAba() ?? false);
+        // Mesma regra de AgendaProfissionais\Index::mount() — coordinator/supervisor
+        // mantém edição irrestrita (agenda de qualquer paciente) só pelo papel Spatie,
+        // sem depender de atender ABA (reverte a checagem de atendeAba() de
+        // 31/08/2026 — ver comentário equivalente lá pro motivo).
+        $ehCoordenacao = $user->hasAnyRole(['coordinator', 'supervisor']);
 
-        if (! $papelOrganizacional && ! $coordenaAba && $user->hasRole('profissional')) {
+        if (! $papelOrganizacional && ! $ehCoordenacao && $user->hasRole('profissional')) {
             $this->isRestrictedProfissional = true;
             $this->podeGerenciarAgenda = (bool) $user->professional?->atendeTerapiaNaoAba();
         } else {

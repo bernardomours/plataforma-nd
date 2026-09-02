@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\Appointment;
 use App\Models\Patient;
+use App\Models\PatientService;
 use App\Models\Professional;
 use App\Models\Agreement;
 use App\Models\Therapy;
@@ -32,6 +33,11 @@ class Index extends Component
     public $start_date = '';
     public $end_date = '';
     public $search = '';
+
+    // Trava por vínculo de coordenação/supervisão (PatientService) — null quando o
+    // usuário não é coordenador/supervisor (sem trava nenhuma dessa natureza); array
+    // (mesmo vazio) quando é, restringindo a query aos pacientes vinculados a ele.
+    public ?array $patientIdsVinculados = null;
 
     // para o import da unimed
     public $showImportModal = false;
@@ -73,6 +79,14 @@ class Index extends Component
             $query->whereHas('patient', function($q) use ($allowedUnitIds) {
                 $q->whereIn('unit_id', $allowedUnitIds);
             });
+        }
+
+        // Trava de coordenador/supervisor (ver mount()): restringe às crianças
+        // vinculadas. Array vazio (coordenador sem nenhum vínculo cadastrado) tem que
+        // devolver zero linhas, não todas — por isso o whereIn entra mesmo vazio, nunca
+        // um "when" condicionado a !empty().
+        if ($this->patientIdsVinculados !== null) {
+            $query->whereIn('patient_id', $this->patientIdsVinculados);
         }
 
         if (!empty($this->patient_id)) {
@@ -164,6 +178,13 @@ class Index extends Component
             $professionalsQuery->whereHas('units', function($q) use ($allowedUnitIds) {
                 $q->whereIn('units.id', $allowedUnitIds);
             });
+        }
+
+        // Mesma trava do buildQuery(): sem isso o combobox de paciente listaria toda a
+        // unidade, e o coordenador selecionaria uma criança que não é sua e sempre veria
+        // "nenhum resultado" sem entender o porquê.
+        if ($this->patientIdsVinculados !== null) {
+            $patientsQuery->whereIn('id', $this->patientIdsVinculados);
         }
 
         $totalConsultas = $query->count();
@@ -366,11 +387,46 @@ class Index extends Component
     public function mount()
     {
         $user = auth()->user();
-        
-        if (!$user->hasAnyRole(['admin', 'manager', 'administrative']) && $user->hasRole('profissional')) {
-            if ($user->professional) {
-                $this->professional_id = $user->professional->id;
+
+        if ($user->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            return;
+        }
+
+        // Coordenador/supervisor vê as crianças que tem vinculadas (mesma fonte de
+        // Coordenacao\Vinculos\Index: PatientService.coordinator_id/supervisor_id),
+        // não as próprias sessões atendidas. Checado ANTES do bloco "profissional" logo
+        // abaixo porque ~17 usuários acumulam papel coordinator + profissional (ver
+        // CLAUDE.md "Autorização") — sem essa ordem, a trava por professional_id abaixo
+        // pegaria esses coordenadores também, escondendo os pacientes que coordenam.
+        if ($user->hasAnyRole(['coordinator', 'supervisor']) && $user->professional) {
+            $professionalId = $user->professional->id;
+
+            $this->patientIdsVinculados = PatientService::query()
+                ->where('coordinator_id', $professionalId)
+                ->orWhere('supervisor_id', $professionalId)
+                ->pluck('patient_id')
+                ->unique()
+                ->values()
+                ->all();
+
+            // Coordenador/supervisor abre a tela já no mês vigente — pedido do usuário.
+            // Valor inicial dos campos de data, não uma trava: continuam editáveis.
+            $this->start_date = now()->startOfMonth()->format('Y-m-d');
+            $this->end_date = now()->endOfMonth()->format('Y-m-d');
+
+            // Coordenador ABA (papel Spatie coordinator + atende ABA na própria
+            // especialidade) abre a tela já filtrada pra ABA — é a terapia que importa
+            // pra ele entre as várias que os pacientes coordenados podem ter. Continua
+            // um filtro normal, não uma trava: dá pra trocar pra outra terapia na tela.
+            if ($user->hasRole('coordinator') && $user->professional->atendeAba()) {
+                $this->therapy_id = Therapy::where('name', 'ABA')->value('id') ?? '';
             }
+
+            return;
+        }
+
+        if ($user->hasRole('profissional') && $user->professional) {
+            $this->professional_id = $user->professional->id;
         }
     }
 

@@ -41,13 +41,16 @@ class Index extends Component
 
         $papelOrganizacional = $user->hasAnyRole(['admin', 'manager', 'administrative']);
 
-        // coordinator/supervisor só mantém edição irrestrita (qualquer profissional)
-        // se realmente atender ABA — Spatie coordinator atribuído por outro motivo
-        // (ex.: acesso à Coordenação da própria especialidade) não basta sozinho.
-        $coordenaAba = $user->hasAnyRole(['coordinator', 'supervisor'])
-            && ($user->professional?->atendeAba() ?? false);
+        // coordinator/supervisor mantém edição irrestrita (qualquer profissional) só
+        // pelo papel Spatie, sem depender de atender ABA. Reverte a checagem de
+        // atendeAba() de 31/08/2026 — o usuário decidiu que o papel de coordenação é
+        // prioritário: quem é coordenador/supervisor gerencia a agenda de qualquer
+        // profissional independente da própria especialidade. Motivou o caso de Willian
+        // da Silva Nunes (coordenador de Psicomotricidade, não atende ABA) sem
+        // conseguir mexer na agenda de ninguém, nem a própria.
+        $ehCoordenacao = $user->hasAnyRole(['coordinator', 'supervisor']);
 
-        if (! $papelOrganizacional && ! $coordenaAba && $user->hasRole('profissional')) {
+        if (! $papelOrganizacional && ! $ehCoordenacao && $user->hasRole('profissional')) {
             $this->isRestricted = true;
             $this->podeEditarAgendaPaciente = false;
             if ($user->professional) {

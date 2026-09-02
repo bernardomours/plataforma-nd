@@ -1,5 +1,10 @@
 @php
-    $isProfDisabled = !auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']);
+    // Coordenador/supervisor não fica mais preso ao próprio nome no filtro de
+    // Profissional — a trava dele agora é por paciente vinculado (patientIdsVinculados),
+    // então o select de Profissional volta a ficar livre pra ele também.
+    $isCoordenadorOuSupervisor = auth()->user()->hasAnyRole(['coordinator', 'supervisor'])
+        && ! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']);
+    $isProfDisabled = !auth()->user()->hasAnyRole(['admin', 'manager', 'administrative']) && ! $isCoordenadorOuSupervisor;
 @endphp
 
 <div class="nd-ui">
@@ -95,6 +100,15 @@
                 Limpar filtros
             </button>
         </div>
+
+        @if ($patientIdsVinculados !== null)
+            <div class="flex items-start gap-2 border-b p-4 text-sm" style="border-color: var(--line); background: var(--accent-soft); color: var(--accent-strong)">
+                <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>Mostrando apenas as crianças vinculadas a você como coordenador ou supervisor (ver Vínculos de Pacientes).</span>
+            </div>
+        @endif
 
         <div class="space-y-4 p-4">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

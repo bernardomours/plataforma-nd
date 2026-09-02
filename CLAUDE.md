@@ -857,17 +857,28 @@ liberado pra todo mundo, independente de terapia — isso não mudou).
 `Professional::atendeTerapiaNaoAba()` / `atendeAba()` leem a pivô `professional_therapy`
 (`therapies()`) — nenhuma tabela nova.
 
-**O papel Spatie `coordinator` sozinho não basta mais pra edição irrestrita.** Levantamento em
-28/08/2026 achou 17 usuários com `profissional` + papel elevado (quase sempre `coordinator`); 13
-eram coordenadores/supervisores reais de ABA, mas 4 (Ana Beatriz Santos, Karina Karla Lourenço do
-Nascimento, Maria Nazaré da Silva Izidio do Nascimento, Willian da Silva Nunes) não atendem ABA e
-tinham o papel só, ao que tudo indica, pra acessar as telas de Coordenação da própria
-especialidade — o que **destravava sem querer** edição irrestrita da agenda de qualquer
-profissional nessas duas telas. Confirmado com o usuário: `coordinator`/`supervisor` só mantém
-edição irrestrita (qualquer profissional/paciente) se o `Professional` vinculado realmente
-atender ABA (`atendeAba()`); sem isso, cai na mesma regra de "só a própria agenda" de um
-profissional comum. Não afeta o acesso às telas de Coordenação em si (isso é outra checagem,
-inalterada) — só tira a edição de agenda alheia que vinha de carona.
+**O papel Spatie `coordinator`/`supervisor` sozinho volta a bastar pra edição irrestrita —
+revertido em 02/09/2026.** Levantamento em 28/08/2026 achou 17 usuários com `profissional` +
+papel elevado (quase sempre `coordinator`); 13 eram coordenadores/supervisores reais de ABA, mas
+4 (Ana Beatriz Santos, Karina Karla Lourenço do Nascimento, Maria Nazaré da Silva Izidio do
+Nascimento, Willian da Silva Nunes) não atendem ABA. A hipótese de 31/08 era que esses 4 tinham
+o papel só pra acessar telas de Coordenação da própria especialidade, e que `coordinator`
+sozinho **destravava sem querer** edição irrestrita da agenda de qualquer profissional — a
+correção de então exigiu `atendeAba()` além do papel Spatie pra manter edição irrestrita, caindo
+os 4 pra "só a própria agenda" (mesma regra de profissional comum) senão atendessem terapia não-ABA.
+
+Bug relatado pelo usuário em 02/09/2026: Willian **coordena Psicomotricidade** (terapia não-ABA)
+e, com a checagem de `atendeAba()`, ficou sem conseguir mexer em agenda nenhuma — nem a própria,
+porque como profissional ele também não atende nenhuma terapia diretamente (`atendeTerapiaNaoAba()`
+falso), então não se qualificava nem pela regra "irrestrito" nem pela regra "só a própria agenda"
+de multi-terapia. A hipótese de 31/08 estava errada pro caso dele: o papel `coordinator` não era
+carona de outra coisa, era literalmente pra coordenar a agenda da própria especialidade — só que
+não-ABA. Decisão do usuário: **papel de coordenação é prioritário**, sem depender de terapia.
+`atendeAba()` saiu da checagem em `AgendaProfissionais\Index::mount()` e `Pacientes\Agenda::mount()`;
+`coordinator`/`supervisor` volta a bastar sozinho, igual antes de 31/08. O método
+`Professional::atendeAba()` continua existindo (não é usado em mais nenhum lugar do código, mas
+não faz mal manter — é um helper de domínio genérico, não algo específico dessa regra). Não afeta
+o acesso às telas de Coordenação em si (outra checagem, inalterada).
 
 Em `AgendaProfissionais\Index`: `$podeEditarAgendaPaciente` (sempre `true` fora do caso
 restrito) governa "Agendar Paciente", a zona de clique pra novo agendamento e os botões
@@ -1081,6 +1092,53 @@ acrescentar `->withTrashed()` na definição da rota pra cobrir o caso de profis
 (equivalente ao `Route::withTrashed()` nativo do Laravel, que o `Livewire\Drawer\
 ImplicitRouteBinding` respeita). Autorização por unidade e eager load acontecem depois, dentro
 do `mount()`, sobre o model já resolvido.
+
+---
+
+## Filtro de Terapias Realizadas por vínculo de coordenação (02/09/2026)
+
+`TerapiasRealizadas\Index` travava `professional_id` no próprio registro pra qualquer usuário
+sem papel administrativo que tivesse `hasRole('profissional')` — inclusive coordenador e
+supervisor, porque ~17 usuários acumulam `coordinator` + `profissional` (ver "Autorização").
+Na prática, um coordenador via só as sessões que ele mesmo atendeu como profissional, não as
+crianças que coordena.
+
+Pedido do usuário: coordenador/supervisor deve ver as **crianças vinculadas a ele**
+(`PatientService.coordinator_id`/`supervisor_id` — mesma fonte de `Coordenacao\Vinculos\Index`,
+que já respondia "quais crianças tem este coordenador, em qual ambiente"), não as próprias
+sessões atendidas. `mount()` agora checa `hasAnyRole(['coordinator','supervisor'])` **antes** do
+bloco de `profissional` — se for coordenador/supervisor, `patientIdsVinculados` é preenchido com
+os `patient_id` de `PatientService` onde ele é coordenador OU supervisor, e a trava por
+`professional_id` nem entra em jogo. Um coordenador que não é (também) `profissional` já caía
+fora da condição antiga; a mudança real é a ordem de prioridade pros que acumulam os dois papéis.
+
+`patientIdsVinculados` é `null` (sem trava dessa natureza) pra quem não é coordenador/
+supervisor, ou um **array** (mesmo vazio) pra quem é — a distinção importa: coordenador sem
+nenhum vínculo cadastrado tem que ver zero atendimentos, não todos. Por isso o filtro em
+`buildQuery()` é sempre `whereIn('patient_id', $this->patientIdsVinculados)` quando não-nulo,
+nunca condicionado a `!empty()` (que trataria array vazio como "sem filtro").
+
+O combobox de Paciente também é restrito à mesma lista, senão o coordenador selecionaria uma
+criança que não é sua e só veria "nenhum resultado" sem entender por quê. Já o combobox de
+Profissional **deixa de ficar travado/desabilitado** pra coordenador/supervisor (`$isProfDisabled`
+no blade passou a excluir esse papel) — já que a trava agora é por paciente, filtrar por qual AT
+atendeu uma criança que ele coordena continua fazendo sentido. Profissional puro (sem
+coordinator/supervisor) mantém o comportamento antigo, travado no próprio nome.
+
+**Coordenador ABA abre a tela já filtrada em ABA.** Pedido à parte do mesmo dia: quem tem o
+papel Spatie `coordinator` **e** atende ABA na própria especialidade (`Professional::
+atendeAba()`) tem `therapy_id` pré-preenchido com o id de ABA dentro do mesmo bloco que calcula
+`patientIdsVinculados`. É um valor inicial, não uma trava — o `<select>` de Terapia continua
+normal, então o coordenador troca pra outra terapia se quiser ver os demais atendimentos dos
+pacientes que coordena. Checagem restrita a `coordinator` (não inclui `supervisor`) porque foi
+assim que o usuário pediu desta vez — diferente da trava por vínculo acima, que é `coordinator`
+**ou** `supervisor`.
+
+**Coordenador/supervisor também abre a tela já no mês vigente.** `start_date`/`end_date` vêm
+pré-preenchidos com o primeiro e o último dia do mês corrente, no mesmo bloco que calcula
+`patientIdsVinculados` — vale pros dois papéis (diferente do filtro de ABA acima, que é só
+`coordinator`). Também é só valor inicial: os campos de data continuam editáveis, não é uma
+trava. Admin/manager/administrative e profissional puro não são afetados.
 
 ---
 
