@@ -42,6 +42,27 @@ class Index extends Component
     public $motivo_retorno = '';
     public $professionalIdToRestore = null;
 
+    public function mount()
+    {
+        $this->autorizarAcesso();
+    }
+
+    /**
+     * SEGURANÇA: componente não tinha nenhuma checagem de papel própria — só o
+     * middleware `role:admin|manager|administrative` da rota `/profissionais`, que
+     * não é reexecutado pelas ações do Livewire. Especialmente sensível aqui porque
+     * registrarSaida()/registrarRetorno() revogam e restauram ACESSO AO SISTEMA de
+     * outros usuários (ver "Contas de acesso" no CLAUDE.md) — sem esta checagem, um
+     * profissional comum conseguia inativar ou reativar a conta de um colega
+     * chamando o método direto.
+     */
+    private function autorizarAcesso(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para acessar Profissionais.');
+        }
+    }
+
     // Reseta paginação se alterar filtros ou quantidade por página
     public function updated($property)
     {
@@ -91,6 +112,8 @@ class Index extends Component
 
     public function registrarSaida()
     {
+        $this->autorizarAcesso();
+
         $this->validate([
             'motivo_saida' => 'required|string',
             'observacao_saida' => 'nullable|string',
@@ -218,6 +241,8 @@ class Index extends Component
 
     public function registrarRetorno()
     {
+        $this->autorizarAcesso();
+
         $this->validate([
             'motivo_retorno' => 'required|string',
         ]);

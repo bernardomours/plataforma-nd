@@ -157,8 +157,13 @@
                                                             </div>
                                                             <div class="text-[9px] font-bold text-blue-600 uppercase">{{ $horario->therapy?->name ?? 'N/A' }}</div>
                                                         </div>
-                                                        <div class="text-[10px] font-bold text-gray-700 leading-tight">
-                                                            {{ mb_strtoupper($horario->patient?->name ?? 'Paciente Removido') }}
+                                                        <div class="text-[10px] font-bold text-gray-700 leading-tight flex items-center gap-1 flex-wrap">
+                                                            <span>{{ mb_strtoupper($horario->patient?->name ?? 'Paciente Removido') }}</span>
+                                                            @if($horario->patient?->trashed())
+                                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wide bg-red-100 text-red-600 leading-none" title="Este paciente tem saída registrada.">
+                                                                    Inativo
+                                                                </span>
+                                                            @endif
                                                         </div>
                                                         <div class="text-[9px] text-gray-500 mt-1 truncate pr-12">{{ $horario->serviceType?->name ?? 'Clínica' }}</div>
                                                         

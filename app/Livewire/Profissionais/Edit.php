@@ -24,6 +24,8 @@ class Edit extends Component
 
     public function mount($professional)
     {
+        $this->autorizarPapel();
+
         $record = Professional::findOrFail($professional);
 
         // SEGURANÇA (IDOR): Professional não tem coluna unit_id (removida na migration
@@ -57,6 +59,20 @@ class Edit extends Component
     {
         if (! auth()->user()->canAccessAnyUnit($record->units->pluck('id')->toArray())) {
             abort(403, 'Você não tem permissão para acessar profissionais desta unidade.');
+        }
+    }
+
+    /**
+     * SEGURANÇA: só a unidade era checada — nada impedia um profissional comum (sem
+     * papel elevado) de editar o cadastro de um COLEGA da mesma unidade, já que o
+     * middleware `role:admin|manager|administrative` da rota não é reexecutado pelas
+     * ações do Livewire (mesma lacuna documentada pra outras telas na "Auditoria de
+     * acesso do papel profissional" no CLAUDE.md).
+     */
+    private function autorizarPapel(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para editar profissionais.');
         }
     }
 
@@ -123,6 +139,7 @@ class Edit extends Component
 
     public function save()
     {
+        $this->autorizarPapel();
         $this->validate();
 
         $record = Professional::findOrFail($this->professionalId);

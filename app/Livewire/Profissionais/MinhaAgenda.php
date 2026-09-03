@@ -114,7 +114,11 @@ class MinhaAgenda extends Component
             // Busca os horários de hoje deste profissional específico. Bloqueio de
             // horário ("Notificar Indisponível") não tem paciente nem terapia — sem o
             // filtro, aparecia na lista como "Paciente Indefinido/Removido".
-            $agendamentos = Schedule::with(['patient', 'therapy', 'serviceType'])
+            //
+            // withTrashed() no patient: paciente com saída registrada continua
+            // mostrando o nome (com badge "Inativo" no blade) em vez do genérico
+            // "Paciente Removido" — mesmo pedido do usuário em AgendaProfissionais\Index.
+            $agendamentos = Schedule::with(['patient' => fn ($q) => $q->withTrashed(), 'therapy', 'serviceType'])
                 ->where('professional_id', $profissional->id)
                 ->where('is_blocked', false)
                 ->where(function($query) use ($hojeNome, $hojeNomeSemAcento) {

@@ -85,8 +85,23 @@ class Create extends Component
         ];
     }
 
+    /**
+     * SEGURANÇA: componente não tinha nenhuma checagem de papel própria — só o
+     * middleware `role:admin|manager|administrative` da rota `/profissionais/cadastrar`,
+     * que não é reexecutado pelas ações do Livewire (mesma lacuna documentada em
+     * "Auditoria de acesso do papel profissional" no CLAUDE.md pra outras telas).
+     */
+    private function autorizarAcesso(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager', 'administrative'])) {
+            abort(403, 'Você não tem permissão para cadastrar profissionais.');
+        }
+    }
+
     private function performSave()
     {
+        $this->autorizarAcesso();
+
         $this->validate();
 
         $professional = Professional::create([

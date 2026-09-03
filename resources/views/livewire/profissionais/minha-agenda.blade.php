@@ -44,8 +44,13 @@
                         <div class="w-1 rounded-full {{ $isPassado ? 'bg-gray-300' : 'bg-blue-400' }} self-stretch"></div>
 
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-sm font-bold text-gray-900 truncate" title="{{ $horario->patient?->name ?? 'Paciente Removido' }}">
-                                {{ $horario->patient?->name ?? 'Paciente Indefinido/Removido' }}
+                            <h4 class="text-sm font-bold text-gray-900 truncate flex items-center gap-1.5" title="{{ $horario->patient?->name ?? 'Paciente Removido' }}">
+                                <span class="truncate">{{ $horario->patient?->name ?? 'Paciente Indefinido/Removido' }}</span>
+                                @if($horario->patient?->trashed())
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-red-100 text-red-600 leading-none shrink-0" title="Este paciente tem saída registrada.">
+                                        Inativo
+                                    </span>
+                                @endif
                             </h4>
 
                             <div class="flex flex-wrap items-center gap-2 mt-1.5">

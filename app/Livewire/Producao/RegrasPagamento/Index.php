@@ -65,10 +65,28 @@ class Index extends Component
 
     public function mount()
     {
+        $this->autorizarAcesso();
+
         $this->profissionais = Professional::orderBy('name')->get();
         $this->terapias = Therapy::orderBy('name')->get();
         $this->convenios = Agreement::orderBy('name')->get();
         $this->ambientes = ServiceType::orderBy('name')->get(); // <-- Carregando lista do banco
+    }
+
+    /**
+     * SEGURANÇA: componente não tinha nenhuma checagem de papel própria — só o
+     * middleware `role:admin|manager` da rota `/regras-pagamento`, que não é
+     * reexecutado pelas ações do Livewire (mesma classe de lacuna já corrigida em
+     * outras telas de Produção, ver CLAUDE.md "Auditoria de acesso"). Sem isto, quem
+     * já tivesse um snapshot do componente carregado (ex.: papel rebaixado no meio da
+     * sessão) continuava criando/editando/excluindo regra de pagamento de qualquer
+     * profissional via requisição direta ao Livewire.
+     */
+    private function autorizarAcesso(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            abort(403, 'Você não tem permissão para acessar Regras de Pagamento.');
+        }
     }
 
     public function updatingBusca()
@@ -94,12 +112,16 @@ class Index extends Component
 
     public function abrirModalCriar()
     {
+        $this->autorizarAcesso();
+
         $this->resetForm();
         $this->modalAberto = true;
     }
 
     public function abrirModalEditar($id)
     {
+        $this->autorizarAcesso();
+
         $this->resetForm();
         $regra = ProfessionalPaymentRule::findOrFail($id);
 
@@ -117,6 +139,8 @@ class Index extends Component
 
     public function salvar()
     {
+        $this->autorizarAcesso();
+
         $this->validate();
 
         $valorNumerico = (float) str_replace(',', '.', $this->amount);
@@ -147,12 +171,16 @@ class Index extends Component
 
     public function confirmarExclusao($id)
     {
+        $this->autorizarAcesso();
+
         $this->regra_id = $id;
         $this->modalExclusaoAberto = true;
     }
 
     public function excluir()
     {
+        $this->autorizarAcesso();
+
         ProfessionalPaymentRule::findOrFail($this->regra_id)->delete();
         $this->modalExclusaoAberto = false;
         $this->resetForm();

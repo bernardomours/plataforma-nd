@@ -349,7 +349,10 @@ class Index extends Component
 
         if (!$this->professional_id) return $agenda;
 
-        $horarios = Schedule::with(['patient', 'therapy', 'serviceType'])
+        // withTrashed() no patient: sem isso, um horário de paciente com saída
+        // registrada (soft delete) mostrava "Paciente Removido" genérico — pedido do
+        // usuário pra continuar mostrando quem era, só sinalizando com um badge.
+        $horarios = Schedule::with(['patient' => fn ($q) => $q->withTrashed(), 'therapy', 'serviceType'])
             ->where('professional_id', $this->professional_id)
             ->orderBy('start_time')
             ->get();
