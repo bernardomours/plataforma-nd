@@ -74,18 +74,19 @@ class Index extends Component
     }
 
     /**
-     * SEGURANÇA: componente não tinha nenhuma checagem de papel própria — só o
-     * middleware `role:admin|manager` da rota `/regras-pagamento`, que não é
-     * reexecutado pelas ações do Livewire (mesma classe de lacuna já corrigida em
-     * outras telas de Produção, ver CLAUDE.md "Auditoria de acesso"). Sem isto, quem
-     * já tivesse um snapshot do componente carregado (ex.: papel rebaixado no meio da
-     * sessão) continuava criando/editando/excluindo regra de pagamento de qualquer
-     * profissional via requisição direta ao Livewire.
+     * SEGURANÇA: componente não tinha nenhuma checagem própria — só o middleware da
+     * rota `/regras-pagamento`, que não é reexecutado pelas ações do Livewire (mesma
+     * classe de lacuna já corrigida em outras telas de Produção, ver CLAUDE.md
+     * "Auditoria de acesso"). A rota NÃO exige papel Spatie nenhum — só `auth` +
+     * `producao.access` (middleware `CheckProductionAccess`, que checa a flag
+     * `users.can_access_production`, não role). Corrigido em 04/09/2026: a primeira
+     * versão exigia `hasAnyRole(['admin','manager'])` por engano, bloqueando
+     * administrative com a flag ligada — bug relatado pelo usuário.
      */
     private function autorizarAcesso(): void
     {
-        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
-            abort(403, 'Você não tem permissão para acessar Regras de Pagamento.');
+        if (! auth()->user()->can_access_production) {
+            abort(403, 'Você não tem permissão para acessar a Área de Produção.');
         }
     }
 

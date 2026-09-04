@@ -1090,6 +1090,17 @@ pediu o padrão trocado sem perder o dado: `$mostrarInativos` (toggle, `false` p
 com quem já saiu, mas continua alcançável marcando a caixa — nada foi apagado nem deixou de
 existir, só mudou o que aparece sem pedir.
 
+**Checagem de acesso própria, adicionada e depois corrigida (02–04/09/2026).** O componente não
+tinha nenhuma checagem própria — só a rota `/regras-pagamento`, que exige `auth` + o middleware
+`producao.access` (`CheckProductionAccess`, que checa a flag `users.can_access_production`) e
+**não exige papel Spatie nenhum**. A primeira correção (02/09) presumiu errado que a rota era
+`role:admin|manager` e passou a exigir `hasAnyRole(['admin','manager'])` no componente —
+bloqueando qualquer `administrative` com a flag ligada, mesmo que devesse ter acesso. Bug
+relatado pelo usuário em 04/09: corrigido trocando a checagem pra `can_access_production`
+diretamente, igual ao middleware da rota. Lição: ao adicionar checagem de componente pra igualar
+o middleware da rota, **ler o middleware de verdade**, não assumir pelo padrão mais comum no
+resto do projeto — nem toda tela de Produção é `role:admin|manager`.
+
 ### `Profissionais\Show`: nova tela de visualização
 
 Troca o antigo botão "Editar" da listagem por "Visualizar Dados" (mesmo texto/ícone de
